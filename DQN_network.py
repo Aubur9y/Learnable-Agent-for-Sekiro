@@ -102,6 +102,10 @@ class Agent:
         else:
             self.epsilon = self.eps_min
 
+    def save_model(self, file_path):
+        torch.save((self.Q_eval.state_dict(), self.Q_eval.optimizer.state_dict()), file_path)
+        print(f"Model saved to {file_path}")
+
 
 
 
