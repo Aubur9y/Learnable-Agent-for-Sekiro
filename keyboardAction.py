@@ -120,35 +120,36 @@ def ReleaseKey(hexKeyCode):
 
 def move_forward():
     PressKey(W)
-    time.sleep(0.5)
+    time.sleep(0.4)
     ReleaseKey(W)
 
 def move_backward():
     PressKey(S)
-    time.sleep(0.5)
+    time.sleep(0.4)
     ReleaseKey(S)
 
 def move_left():
     PressKey(A)
-    time.sleep(0.5)
+    time.sleep(0.4)
     ReleaseKey(A)
 
 def move_right():
     PressKey(D)
-    time.sleep(0.5)
+    time.sleep(0.4)
     ReleaseKey(D)
 
 def lock_vision():
     PressKey(V)
-    time.sleep(0.01)
+    time.sleep(0.3)
     ReleaseKey(V)
+    time.sleep(0.1)
 
 def attack():
     PressKey(J)
     time.sleep(0.05)
     ReleaseKey(J)
 
-def defence():
+def defense():
     PressKey(K)
     time.sleep(0.05)
     ReleaseKey(K)
@@ -175,12 +176,12 @@ def vision_right():
 
 def jump():
     PressKey(SPACE)
-    time.sleep(0.01)
+    time.sleep(0.1)
     ReleaseKey(SPACE)
 
 def dodge():
     PressKey(SHIFT)
-    time.sleep(0.5)
+    time.sleep(0.1)
     ReleaseKey(SHIFT)
 
 def esc():

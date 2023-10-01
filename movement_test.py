@@ -1,8 +1,10 @@
 import keyboardAction
 import time
+import keyboard
+import pygetwindow as gw
 
-time_out = time.time() + 5
-time.sleep(2)
+# time_out = time.time() + 5
+# time.sleep(2)
 
 # while True:
 #     keyboardAction.move_forward()
@@ -26,3 +28,9 @@ time.sleep(2)
 
     # if time.time() > time_out:
     #     break
+
+# Find the window by its title
+window = gw.getWindowsWithTitle('Sekiro')[0]
+
+# Set the window's position (x, y)
+window.moveTo(-10, 0)  # Set the window's position to (100, 100)

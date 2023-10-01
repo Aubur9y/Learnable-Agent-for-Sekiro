@@ -28,22 +28,27 @@ def count_player_blood(player_blood_grayimage):
 
 
 blood_area = (59, 90, 212, 475)  # starting X, starting Y, width, height
+battle_area = (360, 180, 300, 320)
 # img = screen_capture.grab_screen(boss_blood)
 # img.show()
 while True:
     # img = screen_capture.grab_screen(boss_blood)
     # img.show()
 
-    screen_shot = np.array(screen_capture.grab_screen(blood_area))
-    grayscale_img = cv2.cvtColor(screen_shot, cv2.COLOR_RGB2GRAY)
+    # screen_shot = np.array(screen_capture.grab_screen(blood_area))
+    # grayscale_img = cv2.cvtColor(screen_shot, cv2.COLOR_RGB2GRAY)
+    #
+    # boss_blood = count_boss_blood(grayscale_img)
+    # # print('Boss blood: ' + str(boss_blood))
+    #
+    # player_blood = count_player_blood(grayscale_img)
+    # # print('Player blood: ' + str(player_blood))
+    #
+    # cv2.imshow('Gray image', grayscale_img)
 
-    boss_blood = count_boss_blood(grayscale_img)
-    # print('Boss blood: ' + str(boss_blood))
-
-    player_blood = count_player_blood(grayscale_img)
-    # print('Player blood: ' + str(player_blood))
-
-    cv2.imshow('Gray image', grayscale_img)
+    battle_screen_shot = np.array(screen_capture.grab_screen(battle_area))
+    grayscale_img_battle = cv2.cvtColor(battle_screen_shot, cv2.COLOR_RGB2GRAY)
+    cv2.imshow('Gray image', grayscale_img_battle)
 
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):

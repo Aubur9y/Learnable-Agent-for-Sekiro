@@ -11,7 +11,7 @@ class DQNnetwork(nn.Module):
         self.fc1_dims = fc1_dims
         self.fc2_dims = fc2_dims
         self.n_actions = n_actions
-        self.fc1 = nn.Linear(*self.input_dims, self.fc1_dims)
+        self.fc1 = nn.Linear(self.input_dims, self.fc1_dims)
         self.fc2 = nn.Linear(self.fc1_dims, self.fc2_dims)
         self.fc3 = nn.Linear(self.fc2_dims, self.n_actions)
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
@@ -20,6 +20,7 @@ class DQNnetwork(nn.Module):
         self.to(self.device)
 
     def forward(self, state):
+        state = state.float()
         x = F.relu(self.fc1(state))
         x = F.relu(self.fc2(x))
         actions = self.fc3(x)
@@ -42,8 +43,8 @@ class Agent:
         self.Q_eval = DQNnetwork(self.lr, n_actions=n_actions, input_dims=input_dims,
                                  fc1_dims=256, fc2_dims=256)
         
-        self.state_memory = np.zeros((self.mem_size, *input_dims), dtype=np.float32)
-        self.next_state_memory = np.zeros((self.mem_size, *input_dims), dtype=np.float32)
+        self.state_memory = np.zeros((self.mem_size, input_dims), dtype=np.float32)
+        self.next_state_memory = np.zeros((self.mem_size, input_dims), dtype=np.float32)
         self.action_memory = np.zeros(self.mem_size, dtype=np.int32)
         self.reward_memory = np.zeros(self.mem_size, dtype=np.float32)
         self.terminal_memory = np.zeros(self.mem_size, dtype=np.bool_)

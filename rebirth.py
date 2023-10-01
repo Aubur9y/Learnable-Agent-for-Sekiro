@@ -3,7 +3,7 @@ import time
 
 def rebirth():
     print("Dead, restart")
-    time.sleep(6)
+    time.sleep(8)
     keyboardAction.lock_vision()
     time.sleep(0.1)
     keyboardAction.attack()
