@@ -138,10 +138,15 @@ def move_right():
     time.sleep(0.5)
     ReleaseKey(D)
 
-# def lock_vision():
-#     PressKey(V)
-#     time.sleep(0.01)
-#     ReleaseKey(V)
+def lock_vision():
+    PressKey(V)
+    time.sleep(0.01)
+    ReleaseKey(V)
+
+def attack():
+    PressKey(J)
+    time.sleep(0.05)
+    ReleaseKey(J)
 
 def defence():
     PressKey(K)

@@ -43,7 +43,7 @@ while True:
     player_blood = count_player_blood(grayscale_img)
     # print('Player blood: ' + str(player_blood))
 
-    cv2.imshow('1', grayscale_img)
+    cv2.imshow('Gray image', grayscale_img)
 
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):
