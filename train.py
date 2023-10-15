@@ -98,7 +98,7 @@ def reward_mechanism(boss_hp, next_boss_hp, player_hp, next_player_hp, stop_flag
     episode_duration = time.time() - episode_start_time
 
     # Add reward for living longer
-    time_reward = max(0, 10 - episode_duration) * 0.1  # Example: Reward for living up to 10 seconds
+    time_reward = max(0, episode_duration - 10) * 0.1  # Example: Reward for living up to 10 seconds
 
     return player_blood_reward + boss_blood_reward + time_reward, 0, int(next_player_hp < player_hp), 0
 
