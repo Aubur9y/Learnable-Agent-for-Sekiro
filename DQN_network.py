@@ -15,7 +15,7 @@ class DQNnetwork(nn.Module):
         self.fc2 = nn.Linear(self.fc1_dims, self.fc2_dims)
         self.fc3 = nn.Linear(self.fc2_dims, self.n_actions)
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
-        self.loss = nn.MSELoss()
+        self.loss = nn.HuberLoss()
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
 
@@ -29,7 +29,7 @@ class DQNnetwork(nn.Module):
 
 class Agent:
     def __init__(self, gamma, epsilon, lr, input_dims, batch_size, n_actions,
-                 max_mem_size=100000, eps_end=0.01, eps_dec=5e-4):
+                 max_mem_size=50000, eps_end=0.01, eps_dec=5e-4):
         self.gamma = gamma
         self.epsilon = epsilon
         self.eps_min = eps_end
@@ -42,7 +42,7 @@ class Agent:
 
         self.Q_eval = DQNnetwork(self.lr, n_actions=n_actions, input_dims=input_dims,
                                  fc1_dims=256, fc2_dims=256)
-        
+
         self.state_memory = np.zeros((self.mem_size, input_dims), dtype=np.float32)
         self.next_state_memory = np.zeros((self.mem_size, input_dims), dtype=np.float32)
         self.action_memory = np.zeros(self.mem_size, dtype=np.int32)
@@ -93,18 +93,25 @@ class Agent:
 
         q_target = reward_batch + self.gamma * torch.max(q_next, dim=1)[0]
 
-        loss = self.Q_eval.loss(q_target, q_eval).to(self.Q_eval.device)
+        loss = nn.SmoothL1Loss()(q_eval, q_target.unsqueeze(1))
         loss.backward()
         self.Q_eval.optimizer.step()
 
         if self.epsilon > self.eps_min:  # update epsilon
-            self.epsilon = self.epsilon - self.eps_dec
+            self.epsilon -= self.eps_dec
         else:
             self.epsilon = self.eps_min
 
     def save_model(self, file_path):
         torch.save((self.Q_eval.state_dict(), self.Q_eval.optimizer.state_dict()), file_path)
         print(f"Model saved to {file_path}")
+
+    def load_model(self, file_path):
+        model_state_dict, optimizer_state_dict = torch.load(file_path)
+        self.Q_eval.load_state_dict(model_state_dict)
+        self.Q_eval.optimizer.load_state_dict(optimizer_state_dict)
+        print(f"Model loaded from {file_path}")
+
 
 
 
