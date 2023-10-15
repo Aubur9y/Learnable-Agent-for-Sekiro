@@ -1,15 +1,13 @@
-import screen_capture
 from screen_capture import grab_screen
 import cv2
 import numpy as np
 import keyboardAction
 import time
 from DQN_network import Agent
-from DQN_network import DQNnetwork
 from rebirth import rebirth
 import keyboard
-import sys
 import pygetwindow as gw
+import matplotlib.pyplot as plt
 
 
 def count_boss_blood(boss_blood_grayimage):
@@ -30,16 +28,16 @@ def count_player_blood(player_blood_grayimage):
     return player_blood_count
 
 
-def take_action(action):
-    if action == 0:  # n_choose
+def take_action(action_choice):
+    if action_choice == 0:  # no action
         pass
-    elif action == 1:  # j
+    elif action_choice == 1:  # j
         keyboardAction.attack()
-    elif action == 2:  # space
+    elif action_choice == 2:  # space
         keyboardAction.jump()
-    elif action == 3:  # k
+    elif action_choice == 3:  # k
         keyboardAction.defense()
-    elif action == 4:  # shift
+    elif action_choice == 4:  # shift
         keyboardAction.dodge()
 
 
@@ -85,63 +83,53 @@ def take_action(action):
 #         done = 0
 #         emergence_break = 0
 #         return reward, done, stop, emergence_break
-def reward_mechanism(boss_hp, next_boss_blood, player_hp, next_player_blood, stop, emergency_break):
-    if next_player_blood < 1:  # player is dead
-        if emergency_break < 2:
-            reward = -10
-            done = 1
-            stop = 0
-            return reward, done, stop, emergency_break
+def reward_mechanism(boss_hp, next_boss_hp, player_hp, next_player_hp, stop_flag,
+                     emergency_break_flag, episode_start_time):
+    if next_player_hp < 1:
+        if emergency_break_flag < 2:
+            return -10, 1, 0, 0
         else:
-            reward = -10
-            done = 1
-            stop = 0
-            emergency_break = 100
-            return reward, done, stop, emergency_break
+            return -10, 1, 0, 100
 
-    player_blood_reward = 0
-    boss_blood_reward = 0
+    player_blood_reward = -2 if next_player_hp < player_hp else 0.1
+    boss_blood_reward = 2 if next_boss_hp < boss_hp else -0.1
 
-    if next_player_blood - player_hp < -5:
-        player_blood_reward = -2
+    # Calculate the time difference in seconds
+    episode_duration = time.time() - episode_start_time
 
-    if next_boss_blood - boss_hp <= -3:
-        boss_blood_reward = 2
+    # Add reward for living longer
+    time_reward = max(0, 10 - episode_duration) * 0.1  # Example: Reward for living up to 10 seconds
 
-    reward = player_blood_reward + boss_blood_reward
-    done = 0
-    emergence_break = 0
-
-    return reward, done, stop, emergence_break
+    return player_blood_reward + boss_blood_reward + time_reward, 0, int(next_player_hp < player_hp), 0
 
 
-def check_pause(paused):  # press T to exit the program
+def check_pause(paused_flag):  # press P to exit the program
     if keyboard.is_pressed('p'):
-        if paused:
-            paused = False
+        if paused_flag:
+            paused_flag = False
             print("Game is starting")
             time.sleep(1)
             keyboardAction.esc()
         else:
-            paused = True
+            paused_flag = True
             print("Game is paused")
             time.sleep(1)
             keyboardAction.esc()
-    if paused:
+    if paused_flag:
         print("Game is paused")
         while True:
             if keyboard.is_pressed('p'):
-                if paused:
-                    paused = False
+                if paused_flag:
+                    paused_flag = False
                     print("Game is starting")
                     time.sleep(1)
                     keyboardAction.esc()
                     break
                 else:
-                    paused = True
+                    paused_flag = True
                     time.sleep(1)
                     keyboardAction.esc()
-    return paused
+    return paused_flag
 
 
 def wait_for_sekiro_window():
@@ -171,7 +159,7 @@ gamma = 0.99
 lr = 0.003
 epsilon = 1.0
 
-file_path = '/model'
+file_path = 'model/test_model_3.pth'
 save_frequency = 5
 
 paused = True
@@ -182,6 +170,9 @@ if __name__ == '__main__':
 
     emergency_break = 0
     paused = check_pause(paused)
+
+    rewards = []  # this is used to plot graph in the end
+    keyboardAction.lock_vision()
 
     for episode in range(EPISODES):
         battle_window_gray = cv2.cvtColor(np.array(grab_screen(battle_area)), cv2.COLOR_RGB2GRAY)
@@ -195,6 +186,7 @@ if __name__ == '__main__':
         total_reward = 0
         stop = 0
         last_time = time.time()
+
         while True:
             state = np.array(state).reshape(-1, input_dims)
             print('took {} seconds'.format(time.time() - last_time))
@@ -211,7 +203,8 @@ if __name__ == '__main__':
             next_player_blood = count_player_blood(blood_window_gray)
 
             reward, done, stop, emergency_break = reward_mechanism(boss_blood, next_boss_blood, player_blood,
-                                                                   next_player_blood, stop, emergency_break)
+                                                                   next_player_blood, stop, emergency_break,
+                                                                   last_time)
 
             if emergency_break == 100:
                 # emergence break , save model and paused
@@ -227,7 +220,10 @@ if __name__ == '__main__':
             player_blood = next_player_blood
             boss_blood = next_boss_blood
             total_reward += reward
+            rewards.append(total_reward)
             paused = check_pause(paused)
+
+            print('reward {} '.format(reward))
 
             if done == 1:
                 break
@@ -237,3 +233,9 @@ if __name__ == '__main__':
 
         print(f'Episode: {episode}, Total Reward: {total_reward}')  # Print the reward for this episode
         rebirth()
+
+    plt.plot(rewards)
+    plt.xlabel('Episode')
+    plt.ylabel('Total Reward')
+    plt.title('Rewards over Episodes')
+    plt.show()
