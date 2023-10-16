@@ -186,7 +186,7 @@ def dodge():
 
 def esc():
     PressKey(ESC)
-    time.sleep(0.01)
+    time.sleep(0.1)
     ReleaseKey(ESC)
 
 def rebirth():

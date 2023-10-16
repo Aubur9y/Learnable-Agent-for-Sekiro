@@ -38,7 +38,7 @@ class Agent:
         self.action_space = [i for i in range(n_actions)]
         self.mem_size = max_mem_size
         self.batch_size = batch_size
-        self.men_cntr = 0
+        self.mem_cntr = 0
 
         self.Q_eval = DQNnetwork(self.lr, n_actions=n_actions, input_dims=input_dims,
                                  fc1_dims=256, fc2_dims=256)
@@ -50,18 +50,18 @@ class Agent:
         self.terminal_memory = np.zeros(self.mem_size, dtype=np.bool_)
 
     def store_data(self, state, action, reward, next_state, done):
-        index = self.men_cntr % self.mem_size  # find the position of the first unoccupied memory
+        index = self.mem_cntr % self.mem_size  # find the position of the first unoccupied memory
         self.state_memory[index] = state
         self.next_state_memory[index] = next_state
         self.reward_memory[index] = reward
         self.action_memory[index] = action
         self.terminal_memory[index] = done
 
-        self.men_cntr += 1
+        self.mem_cntr += 1
 
     def choose_action(self, state):  # choose an action based on current state(observation)
         if np.random.random() > self.epsilon:
-            state = torch.tensor([state]).to(self.Q_eval.device)
+            state = torch.tensor(np.array([state])).to(self.Q_eval.device)
             actions = self.Q_eval.forward(state)
             action = torch.argmax(actions).item()
         else:
@@ -70,12 +70,12 @@ class Agent:
         return action
 
     def learn(self):
-        if self.men_cntr < self.batch_size:
+        if self.mem_cntr < self.batch_size:
             return
 
         self.Q_eval.optimizer.zero_grad()  # start off with zero gradient
 
-        max_mem = min(self.men_cntr, self.mem_size)  # choose a subset of all memory
+        max_mem = min(self.mem_cntr, self.mem_size)  # choose a subset of all memory
         batch = np.random.choice(max_mem, self.batch_size, replace=False)
 
         batch_index = np.arange(self.batch_size, dtype=np.int32)
@@ -93,14 +93,11 @@ class Agent:
 
         q_target = reward_batch + self.gamma * torch.max(q_next, dim=1)[0]
 
-        loss = nn.SmoothL1Loss()(q_eval, q_target.unsqueeze(1))
+        loss = nn.HuberLoss()(q_eval, q_target)
         loss.backward()
         self.Q_eval.optimizer.step()
 
-        if self.epsilon > self.eps_min:  # update epsilon
-            self.epsilon -= self.eps_dec
-        else:
-            self.epsilon = self.eps_min
+        self.epsilon = max(self.eps_min, self.epsilon - self.eps_dec)
 
     def save_model(self, file_path):
         torch.save((self.Q_eval.state_dict(), self.Q_eval.optimizer.state_dict()), file_path)
@@ -111,37 +108,4 @@ class Agent:
         self.Q_eval.load_state_dict(model_state_dict)
         self.Q_eval.optimizer.load_state_dict(optimizer_state_dict)
         print(f"Model loaded from {file_path}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
