@@ -4,31 +4,67 @@ import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 
+
 class DQNnetwork(nn.Module):
-    def __init__(self, lr, input_dims, fc1_dims, fc2_dims, n_actions):
+    # def __init__(self, lr, input_dims, fc1_dims, fc2_dims, n_actions):
+    #     super(DQNnetwork, self).__init__()
+    #     self.input_dims = input_dims
+    #     self.fc1_dims = fc1_dims
+    #     self.fc2_dims = fc2_dims
+    #     self.n_actions = n_actions
+    #     self.fc1 = nn.Linear(self.input_dims, self.fc1_dims)
+    #     self.fc2 = nn.Linear(self.fc1_dims, self.fc2_dims)
+    #     self.fc3 = nn.Linear(self.fc2_dims, self.n_actions)
+    #     self.optimizer = optim.Adam(self.parameters(), lr=lr)
+    #     self.loss = nn.HuberLoss()
+    #     self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    #     self.to(self.device)
+
+    def __init__(self, lr, input_channels, n_actions, height, width):
         super(DQNnetwork, self).__init__()
-        self.input_dims = input_dims
-        self.fc1_dims = fc1_dims
-        self.fc2_dims = fc2_dims
-        self.n_actions = n_actions
-        self.fc1 = nn.Linear(self.input_dims, self.fc1_dims)
-        self.fc2 = nn.Linear(self.fc1_dims, self.fc2_dims)
-        self.fc3 = nn.Linear(self.fc2_dims, self.n_actions)
+
+        # define the convolutional layers
+        self.conv1 = nn.Conv2d(input_channels, 32, kernel_size=8, stride=4, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1)
+
+        self.fc1_input_dims = self.get_conv_output_dims((height, width))
+
+        self.fc1 = nn.Linear(self.fc1_input_dims, 512)
+        self.fc2 = nn.Linear(512, n_actions)
+
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
         self.loss = nn.HuberLoss()
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
 
     def forward(self, state):
-        state = state.float()
-        x = F.relu(self.fc1(state))
-        x = F.relu(self.fc2(x))
-        actions = self.fc3(x)
+        # pass the state through the convolutional layers
+        x = F.relu(self.conv1(state))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+
+        # flatten the output of the convolutional layers for the fully connected layers
+        x = x.view(x.size(0), -1)
+
+        # pass the flattened output through the fully connected layers
+        x = F.relu(self.fc1(x))
+        actions = self.fc2(x)
 
         return actions
 
+    def get_conv_output_dims(self, input_dims):
+        with torch.no_grad():
+            x = torch.zeros(1, *input_dims)
+            x = self.conv1(x)  # simulate the operations of convolutional layer
+            x = self.conv2(x)
+            x = self.conv3(x)
+            return int(np.prod(x.size()))  # this gives the total number of elements in the output tensor,
+            # channels * width * height
+
+
 class Agent:
-    def __init__(self, gamma, epsilon, lr, input_dims, batch_size, n_actions,
+    def __init__(self, gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions,
                  max_mem_size=50000, eps_end=0.01, eps_dec=5e-4):
         self.gamma = gamma
         self.epsilon = epsilon
@@ -40,11 +76,11 @@ class Agent:
         self.batch_size = batch_size
         self.mem_cntr = 0
 
-        self.Q_eval = DQNnetwork(self.lr, n_actions=n_actions, input_dims=input_dims,
-                                 fc1_dims=256, fc2_dims=256)
+        self.Q_eval = DQNnetwork(lr, input_channels, n_actions, height, width)
+        self.Q_eval.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-        self.state_memory = np.zeros((self.mem_size, input_dims), dtype=np.float32)
-        self.next_state_memory = np.zeros((self.mem_size, input_dims), dtype=np.float32)
+        self.state_memory = np.zeros((self.mem_size, input_channels, height, width), dtype=np.float32)
+        self.next_state_memory = np.zeros((self.mem_size, input_channels, height, width), dtype=np.float32)
         self.action_memory = np.zeros(self.mem_size, dtype=np.int32)
         self.reward_memory = np.zeros(self.mem_size, dtype=np.float32)
         self.terminal_memory = np.zeros(self.mem_size, dtype=np.bool_)
@@ -61,7 +97,9 @@ class Agent:
 
     def choose_action(self, state):  # choose an action based on current state(observation)
         if np.random.random() > self.epsilon:
-            state = torch.tensor(np.array([state])).to(self.Q_eval.device)
+            state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(
+                self.Q_eval.device)  # Convert numpy array to tensor, set type to float32, add batch dimension,
+            # and send to device
             actions = self.Q_eval.forward(state)
             action = torch.argmax(actions).item()
         else:
@@ -108,4 +146,3 @@ class Agent:
         self.Q_eval.load_state_dict(model_state_dict)
         self.Q_eval.optimizer.load_state_dict(optimizer_state_dict)
         print(f"Model loaded from {file_path}")
-

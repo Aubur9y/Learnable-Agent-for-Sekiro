@@ -15,7 +15,7 @@ def count_boss_blood(boss_blood_grayimage):
     return sum(75 > gray_value > 65 for gray_value in boss_blood_grayimage[0])
 
 def count_player_blood(player_blood_grayimage):
-    return sum(97 > gray_value > 92 for gray_value in player_blood_grayimage[-1])
+    return sum(97 > gray_value > 92 for gray_value in player_blood_grayimage[0])
 
 
 def take_action(action_choice):
@@ -92,30 +92,32 @@ def wait_for_sekiro_window():
 def is_unwanted_state(image):
     return np.any((image[-1] == 208) | (image[-1] == 209) | (image[-1] == 0))
 
-width = 128
-height = 128
+width = 84
+height = 84
+input_channels = 1  # 1 for grayscale, 3 for RGB
 battle_area = (360, 180, 300, 320)
-blood_area = (59, 90, 212, 475)
+boss_blood_area = (59, 90, 212, 475)
+player_blood_area = (60, 560, 305, 5)
 
 EPISODES = 1000
 
-input_dims = width * height
+input_dims = (input_channels, height, width)
 n_actions = 5  # attack, defense, dodge, jump and no action
 batch_size = 16
 gamma = 0.99
 lr = 0.003
 epsilon = 1.0
 
-file_path = 'model/test_model_4.pth'
+file_path = 'model/test_model_5.pth'
 save_frequency = 5
 
 paused = False
 
 if __name__ == '__main__':
     wait_for_sekiro_window()
-    agent = Agent(gamma, epsilon, lr, input_dims, batch_size, n_actions)
+    agent = Agent(gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions)
     # check_pause(paused)
-    starting_window = cv2.cvtColor(np.array(grab_screen(blood_area)), cv2.COLOR_RGB2GRAY)
+    starting_window = cv2.cvtColor(np.array(grab_screen(player_blood_area)), cv2.COLOR_RGB2GRAY)
     if is_unwanted_state(starting_window):
         paused = check_pause(True)
 
@@ -126,30 +128,35 @@ if __name__ == '__main__':
         paused = check_pause(False)
 
         battle_window_gray = cv2.cvtColor(np.array(grab_screen(battle_area)), cv2.COLOR_RGB2GRAY)
-        blood_window_gray = cv2.cvtColor(np.array(grab_screen(blood_area)), cv2.COLOR_RGB2GRAY)
 
-        if is_unwanted_state(blood_window_gray):
+        # count hp for both boss and player
+        boss_blood_window_gray = cv2.cvtColor(np.array(grab_screen(boss_blood_area)), cv2.COLOR_RGB2GRAY)
+        player_blood_window_gray = cv2.cvtColor(np.array(grab_screen(player_blood_area)), cv2.COLOR_RGB2GRAY)
+
+        if is_unwanted_state(player_blood_window_gray):
             print(f'Episode: {episode} stopped due to unwanted state!')
             agent.save_model(file_path)
             paused = check_pause(True)  # If the game is in an unwanted state, force pause
             if paused:
                 continue  # Skip to the next episode
 
-        state = cv2.resize(battle_window_gray, (width, height)).reshape(-1, input_dims)
-        boss_blood = count_boss_blood(blood_window_gray)
-        player_blood = count_player_blood(blood_window_gray)
-        print('Player blood: ' + str(player_blood))
-        print('Boss blood: ' + str(boss_blood))
+        state = cv2.resize(battle_window_gray, (width, height))
+        state = np.expand_dims(state, axis=0)  # Shape: (1, height, width)
+
+        boss_blood = count_boss_blood(boss_blood_window_gray)
+        player_blood = count_player_blood(player_blood_window_gray)
 
         done = 0
         total_reward = 0
         stop = 0
+        round_count = 0
+
         last_time = time.time()
 
         while True:
             paused = check_pause(False)
 
-            state = np.array(state).reshape(-1, input_dims)
+            # state = np.array(state).reshape(-1, input_dims)
             print('took {} seconds'.format(time.time() - last_time))
             last_time = time.time()
 
@@ -157,19 +164,16 @@ if __name__ == '__main__':
             take_action(action)
 
             battle_window_gray = cv2.cvtColor(np.array(grab_screen(battle_area)), cv2.COLOR_RGB2GRAY)
-            blood_window_gray = cv2.cvtColor(np.array(grab_screen(blood_area)), cv2.COLOR_RGB2GRAY)
 
-            # if is_unwanted_state(blood_window_gray):
-            #     print("Emergency break: Unwanted state detected!")
-            #     agent.save_model(file_path)
-            #     paused = True
-            #     paused = check_pause(paused)
-            #     if paused:  # if still paused after checking, break from this episode
-            #         break
+            # count hp for both boss and player
+            boss_blood_window_gray = cv2.cvtColor(np.array(grab_screen(boss_blood_area)), cv2.COLOR_RGB2GRAY)
+            player_blood_window_gray = cv2.cvtColor(np.array(grab_screen(player_blood_area)), cv2.COLOR_RGB2GRAY)
 
-            next_state = cv2.resize(battle_window_gray, (width, height)).reshape(-1, input_dims)
-            next_boss_blood = count_boss_blood(blood_window_gray)
-            next_player_blood = count_player_blood(blood_window_gray)
+            next_state = cv2.resize(battle_window_gray, (width, height))
+            next_state = np.expand_dims(next_state, axis=0)  # Shape: (1, height, width)
+
+            next_boss_blood = count_boss_blood(boss_blood_window_gray)
+            next_player_blood = count_player_blood(player_blood_window_gray)
 
             reward, done, stop = reward_mechanism(boss_blood, next_boss_blood, player_blood,
                                                   next_player_blood, stop, last_time)
@@ -181,10 +185,10 @@ if __name__ == '__main__':
             state = next_state
             player_blood = next_player_blood
             boss_blood = next_boss_blood
+
             total_reward += reward
             rewards.append(total_reward)
-
-            print('reward {} '.format(reward))
+            round_count += 1
 
             if done == 1:
                 break
@@ -192,7 +196,8 @@ if __name__ == '__main__':
         if episode % save_frequency == 0:  # Save the model after every 10 episodes
             agent.save_model(file_path)
 
-        print(f'Episode: {episode}, Total Reward: {total_reward}')  # Print the reward for this episode
+        average_reward_per_episode = total_reward / round_count
+        print(f'Episode: {episode}, Average Reward: {average_reward_per_episode}')  # Print the reward for this episode
         if player_blood < 1:
             rebirth()
 
