@@ -16,8 +16,6 @@ gamma = 0.99
 learning_rates = [0.001, 0.003, 0.005]
 epsilons = [0.5, 0.7, 1.0]
 
-
-
 model_state = torch.load('model/test_model_5.pth')[0]
 
 for lr in learning_rates:
