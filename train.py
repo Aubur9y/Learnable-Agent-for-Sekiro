@@ -1,18 +1,22 @@
+import sys
+
 import cv2
 import numpy as np
+import status
 import keyboardAction
 import time
 import keyboard
 import pygetwindow as gw
 import matplotlib.pyplot as plt
+import detect
 from screen_capture import grab_screen
 from DQN_network import Agent
 from rebirth import rebirth
-import pyautogui
 
 
 def count_boss_blood(boss_blood_grayimage):
     return sum(75 > gray_value > 65 for gray_value in boss_blood_grayimage[0])
+
 
 def count_player_blood(player_blood_grayimage):
     return sum(97 > gray_value > 92 for gray_value in player_blood_grayimage[0])
@@ -33,9 +37,12 @@ def take_action(action_choice):
 
 def reward_mechanism(boss_hp, next_boss_hp, player_hp, next_player_hp, stop_flag,
                      episode_start_time):
+    """return reward, done, stop_flag"""
     if next_player_hp < 1:
         return -10, 1, 0
-    elif next_boss_hp <= 1:
+    elif next_boss_hp == 1:
+        return 10, 0, 0
+    elif next_boss_hp < 1:
         return 10, 1, 0
 
     player_blood_reward = -2 if next_player_hp < player_hp else 0
@@ -58,21 +65,22 @@ def check_pause(paused_flag):
     if keyboard.is_pressed('p'):
         paused_flag = not paused_flag  # Toggle the paused state
         print("Game is {}".format("paused" if paused_flag else "starting"))
+        print("Press 'p' to {}".format("continue" if paused_flag else "pause"))
         time.sleep(2)  # has to wait for current motion to end in order to pause
         # Wait for the 'p' key to be released before proceeding
         keyboardAction.esc()
-        print("2")
 
     if paused_flag:
-        print("Game is paused")
-        print("1")
+        print("Game is paused, press 'T' to stop the program")
         while not keyboard.is_pressed('p'):
             time.sleep(0.1)
+            if keyboard.is_pressed('t'):
+                print('stopping program')
+                sys.exit(0)
         paused_flag = False
         print("Game is starting")
         time.sleep(0.1)
         keyboardAction.esc()
-        print("3")
 
     return paused_flag
 
@@ -89,8 +97,17 @@ def wait_for_sekiro_window():
             time.sleep(1)
 
 
-def is_unwanted_state(image):
-    return np.any((image[-1] == 208) | (image[-1] == 209) | (image[-1] == 0))
+def plot_graph(input_rewards):
+    plt.figure(figsize=(10, 5))  # This will set the figure size. You can adjust if needed.
+    plt.plot(input_rewards)
+    plt.xlabel('Episode')
+    plt.ylabel('Total Reward')
+    plt.title('Rewards over Episodes')
+    plt.grid(True)  # This will add a grid for better readability
+    plt.tight_layout()
+    plt.savefig("rewards_vs_episodes.png")  # Optionally, save the figure to a file
+    plt.show()
+
 
 width = 84
 height = 84
@@ -117,8 +134,7 @@ if __name__ == '__main__':
     wait_for_sekiro_window()
     agent = Agent(gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions)
     # check_pause(paused)
-    starting_window = cv2.cvtColor(np.array(grab_screen(player_blood_area)), cv2.COLOR_RGB2GRAY)
-    if is_unwanted_state(starting_window):
+    if detect.is_pause():
         paused = check_pause(True)
 
     rewards = []  # this is used to plot graph in the end
@@ -127,24 +143,26 @@ if __name__ == '__main__':
     for episode in range(EPISODES):
         paused = check_pause(False)
 
-        battle_window_gray = cv2.cvtColor(np.array(grab_screen(battle_area)), cv2.COLOR_RGB2GRAY)
+        if detect.is_unwanted_state():
+            if detect.is_pause():
+                print(f'Episode: {episode} stopped, menu detected, press p to continue')
+                paused = check_pause(True)
+                while paused:
+                    paused = check_pause(True)
 
-        # count hp for both boss and player
-        boss_blood_window_gray = cv2.cvtColor(np.array(grab_screen(boss_blood_area)), cv2.COLOR_RGB2GRAY)
-        player_blood_window_gray = cv2.cvtColor(np.array(grab_screen(player_blood_area)), cv2.COLOR_RGB2GRAY)
+            elif detect.is_eob():
+                print('Boss defeated, saving model...')
+                agent.save_model(file_path)
+                sys.exit(0)
 
-        if is_unwanted_state(player_blood_window_gray):
-            print(f'Episode: {episode} stopped due to unwanted state!')
-            agent.save_model(file_path)
-            paused = check_pause(True)  # If the game is in an unwanted state, force pause
-            if paused:
-                continue  # Skip to the next episode
+        self_hp_window_gray, boss_hp_window_gray, battle_window_gray = status.get_status(player_blood_area,
+                                                                                         boss_blood_area, battle_area)
 
         state = cv2.resize(battle_window_gray, (width, height))
         state = np.expand_dims(state, axis=0)  # Shape: (1, height, width)
 
-        boss_blood = count_boss_blood(boss_blood_window_gray)
-        player_blood = count_player_blood(player_blood_window_gray)
+        boss_blood = count_boss_blood(boss_hp_window_gray)
+        player_blood = count_player_blood(self_hp_window_gray)
 
         done = 0
         total_reward = 0
@@ -163,17 +181,15 @@ if __name__ == '__main__':
             action = agent.choose_action(state)
             take_action(action)
 
-            battle_window_gray = cv2.cvtColor(np.array(grab_screen(battle_area)), cv2.COLOR_RGB2GRAY)
-
-            # count hp for both boss and player
-            boss_blood_window_gray = cv2.cvtColor(np.array(grab_screen(boss_blood_area)), cv2.COLOR_RGB2GRAY)
-            player_blood_window_gray = cv2.cvtColor(np.array(grab_screen(player_blood_area)), cv2.COLOR_RGB2GRAY)
+            self_hp_window_gray, boss_hp_window_gray, battle_window_gray = status.get_status(player_blood_area,
+                                                                                             boss_blood_area,
+                                                                                             battle_area)
 
             next_state = cv2.resize(battle_window_gray, (width, height))
             next_state = np.expand_dims(next_state, axis=0)  # Shape: (1, height, width)
 
-            next_boss_blood = count_boss_blood(boss_blood_window_gray)
-            next_player_blood = count_player_blood(player_blood_window_gray)
+            next_boss_blood = count_boss_blood(boss_hp_window_gray)
+            next_player_blood = count_player_blood(self_hp_window_gray)
 
             reward, done, stop = reward_mechanism(boss_blood, next_boss_blood, player_blood,
                                                   next_player_blood, stop, last_time)
@@ -198,18 +214,15 @@ if __name__ == '__main__':
 
         average_reward_per_episode = total_reward / round_count
         print(f'Episode: {episode}, Average Reward: {average_reward_per_episode}')  # Print the reward for this episode
+
+        # if boss_blood == 1:  # boss is dead but game is not over yet
+        #     print('boss dead')
+        #     while not detect.is_boss_recovered():
+        #         time.sleep(0.1)
+
         if player_blood < 1:
             rebirth()
 
-    plt.figure(figsize=(10, 5))  # This will set the figure size. You can adjust if needed.
-    plt.plot(rewards)
-    plt.xlabel('Episode')
-    plt.ylabel('Total Reward')
-    plt.title('Rewards over Episodes')
-    plt.grid(True)  # This will add a grid for better readability
-    plt.tight_layout()
-    plt.savefig("rewards_vs_episodes.png")  # Optionally, save the figure to a file
-    plt.show()
-
-    cv2.destroyAllWindows()
+    plot_graph(rewards)
+    # cv2.destroyAllWindows()
 
