@@ -65,7 +65,7 @@ class DQNnetwork(nn.Module):
 
 class Agent:
     def __init__(self, gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions,
-                 max_mem_size=50000, eps_end=0.01, eps_dec=5e-4):
+                 max_mem_size=50000, eps_end=0.01, eps_dec=5e-4, target_update=1000):
         self.gamma = gamma
         self.epsilon = epsilon
         self.eps_min = eps_end
@@ -75,6 +75,9 @@ class Agent:
         self.mem_size = max_mem_size
         self.batch_size = batch_size
         self.mem_cntr = 0
+
+        self.target_update = target_update  # how often to update the target network
+        self.learn_step_counter = 0  # count how many steps we have taken so far
 
         self.Q_eval = DQNnetwork(lr, input_channels, n_actions, height, width)
         self.Q_eval.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -108,6 +111,7 @@ class Agent:
         return action
 
     def learn(self):
+        """ Update the weights and biases of the evaluation network"""
         if self.mem_cntr < self.batch_size:
             return
 
@@ -129,6 +133,11 @@ class Agent:
         q_next = self.Q_eval.forward(next_state_batch)
         q_next[terminal_batch] = 0.0
 
+        self.learn_step_counter += 1
+
+        if self.learn_step_counter % self.target_update == 0:
+            self.update_target_network()
+
         q_target = reward_batch + self.gamma * torch.max(q_next, dim=1)[0]
 
         loss = nn.HuberLoss()(q_eval, q_target)
@@ -136,6 +145,11 @@ class Agent:
         self.Q_eval.optimizer.step()
 
         self.epsilon = max(self.eps_min, self.epsilon - self.eps_dec)
+
+    def update_target_network(self):
+        """ Update the target network with the weights and biases from the evaluation network"""
+        if self.learn_step_counter % self.target_update == 0:
+            self.Q_eval.load_state_dict(self.Q_eval.state_dict())
 
     def save_model(self, file_path):
         torch.save((self.Q_eval.state_dict(), self.Q_eval.optimizer.state_dict()), file_path)
