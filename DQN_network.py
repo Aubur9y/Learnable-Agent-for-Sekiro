@@ -80,7 +80,12 @@ class Agent:
         self.learn_step_counter = 0  # count how many steps we have taken so far
 
         self.Q_eval = DQNnetwork(lr, input_channels, n_actions, height, width)
-        self.Q_eval.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.Q_eval.to(torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'))
+
+        self.Q_target = DQNnetwork(lr, input_channels, n_actions, height, width)
+        self.Q_target.load_state_dict(self.Q_eval.state_dict())
+        self.Q_target.to(self.Q_target.device)
+        self.Q_target.eval()
 
         self.state_memory = np.zeros((self.mem_size, input_channels, height, width), dtype=np.float32)
         self.next_state_memory = np.zeros((self.mem_size, input_channels, height, width), dtype=np.float32)
@@ -112,44 +117,50 @@ class Agent:
 
     def learn(self):
         """ Update the weights and biases of the evaluation network"""
-        if self.mem_cntr < self.batch_size:
-            return
 
-        self.Q_eval.optimizer.zero_grad()  # start off with zero gradient
+        def learn(self):
+            """ Update the weights and biases of the evaluation network"""
+            if self.mem_cntr < self.batch_size:
+                return
 
-        max_mem = min(self.mem_cntr, self.mem_size)  # choose a subset of all memory
-        batch = np.random.choice(max_mem, self.batch_size, replace=False)
+            self.Q_eval.optimizer.zero_grad()  # start off with zero gradient
 
-        batch_index = np.arange(self.batch_size, dtype=np.int32)
+            max_mem = min(self.mem_cntr, self.mem_size)  # choose a subset of all memory
+            batch = np.random.choice(max_mem, self.batch_size, replace=False)
 
-        state_batch = torch.tensor(self.state_memory[batch]).to(self.Q_eval.device)
-        next_state_batch = torch.tensor(self.next_state_memory[batch]).to(self.Q_eval.device)
-        reward_batch = torch.tensor(self.reward_memory[batch]).to(self.Q_eval.device)
-        terminal_batch = torch.tensor(self.terminal_memory[batch]).to(self.Q_eval.device)
+            batch_index = np.arange(self.batch_size, dtype=np.int32)
 
-        action_batch = self.action_memory[batch]
+            state_batch = torch.tensor(self.state_memory[batch]).to(self.Q_eval.device)
+            next_state_batch = torch.tensor(self.next_state_memory[batch]).to(self.Q_eval.device)
+            reward_batch = torch.tensor(self.reward_memory[batch]).to(self.Q_eval.device)
+            terminal_batch = torch.tensor(self.terminal_memory[batch]).to(self.Q_eval.device)
 
-        q_eval = self.Q_eval.forward(state_batch)[batch_index, action_batch]
-        q_next = self.Q_eval.forward(next_state_batch)
-        q_next[terminal_batch] = 0.0
+            action_batch = self.action_memory[batch]
 
-        self.learn_step_counter += 1
+            q_eval = self.Q_eval.forward(state_batch)[batch_index, action_batch]
+            q_next = self.Q_target.forward(next_state_batch)
 
-        if self.learn_step_counter % self.target_update == 0:
-            self.update_target_network()
+            # Use a mask to compute the Q-values of non-terminal states
+            # and avoid modifying q_next in-place
+            q_next_values = torch.zeros_like(q_next.max(1)[0])
+            q_next_values[~terminal_batch] = q_next[~terminal_batch].max(1)[0]
 
-        q_target = reward_batch + self.gamma * torch.max(q_next, dim=1)[0]
+            self.learn_step_counter += 1
 
-        loss = nn.HuberLoss()(q_eval, q_target)
-        loss.backward()
-        self.Q_eval.optimizer.step()
+            if self.learn_step_counter % self.target_update == 0:
+                self.update_target_network()
 
-        self.epsilon = max(self.eps_min, self.epsilon - self.eps_dec)
+            q_target = reward_batch + self.gamma * q_next_values
+
+            loss = self.Q_eval.loss(q_eval, q_target)
+            loss.backward()
+            self.Q_eval.optimizer.step()
+
+            self.epsilon = max(self.eps_min, self.epsilon - self.eps_dec)
 
     def update_target_network(self):
         """ Update the target network with the weights and biases from the evaluation network"""
-        if self.learn_step_counter % self.target_update == 0:
-            self.Q_eval.load_state_dict(self.Q_eval.state_dict())
+        self.Q_target.load_state_dict(self.Q_eval.state_dict())
 
     def save_model(self, file_path):
         torch.save((self.Q_eval.state_dict(), self.Q_eval.optimizer.state_dict()), file_path)
@@ -159,4 +170,5 @@ class Agent:
         model_state_dict, optimizer_state_dict = torch.load(file_path)
         self.Q_eval.load_state_dict(model_state_dict)
         self.Q_eval.optimizer.load_state_dict(optimizer_state_dict)
+        self.Q_target.load_state_dict(self.Q_eval.state_dict())
         print(f"Model loaded from {file_path}")
