@@ -25,7 +25,7 @@ from .memory import Memory
 from .observation import Observer
 
 
-class SekiroEnv():
+class SekiroEnv:
     def __init__(self) -> None:
         self.handle = self.__get_game_handle()
         self.actor = Actor()
