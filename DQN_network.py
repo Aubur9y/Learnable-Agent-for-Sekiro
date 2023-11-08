@@ -29,7 +29,6 @@ class DQNnetwork(nn.Module):
         self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1)
 
         self.fc1_input_dims = self.get_conv_output_dims((height, width))
-        print(f"Flattened Dimension: {self.fc1_input_dims}")
 
         self.fc1 = nn.Linear(self.fc1_input_dims, 512)
         self.fc2 = nn.Linear(512, n_actions)
@@ -149,21 +148,17 @@ class Agent:
         q_eval = self.Q_eval.forward(state_batch)[batch_index, action_batch]
         # Compute the Q-values of the next states according to the target network,
         # the reason I use the target network is to avoid the moving target problem
-        print("next_state_batch shape:", next_state_batch.shape)
         q_next = self.Q_target.forward(next_state_batch)
 
         # Use a mask to compute the Q-values of non-terminal states
         # and avoid modifying q_next in-place
         # This step computes the largest Q-value of the next state
-        print(q_next.shape)
         q_next_values = torch.zeros_like(q_next.max(1)[0])
         q_next_values[~terminal_batch] = q_next[~terminal_batch].max(1)[0]
 
         self.learn_step_counter += 1
 
         # Update the target network once a while, this is to avoid the moving target problem
-        if self.learn_step_counter % self.target_update == 0:
-            self.update_target_network()
 
         # Here I compute the target Q-values which is used to compute the loss
         q_target = reward_batch + self.gamma * q_next_values
@@ -171,6 +166,10 @@ class Agent:
         # I use the loss value to update the weights and biases of the evaluation network
         loss = self.Q_eval.loss(q_eval, q_target)
         loss.backward()
+
+        if self.learn_step_counter % self.target_update == 0:
+            self.update_target_network()
+
         # Optimizer has done the job of updating the weights and biases, or I just need to update manually(not recommended)
         self.Q_eval.optimizer.step()
 
