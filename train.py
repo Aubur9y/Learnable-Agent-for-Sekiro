@@ -1,15 +1,28 @@
 import sys
 import logging
-import detect
+import torch
+import argparse
 import keyboardAction
 import time
 import keyboard
 import pygetwindow as gw
 import matplotlib.pyplot as plt
+import os
 from DQN_network import Agent
 from env import SekiroEnv
 from icecream import ic
-from env import memory
+
+parser = argparse.ArgumentParser(
+    usage='''python3 train.py model/{model name}.pth'''
+)
+parser.add_argument('model', type=str, help='model path')
+
+# parse the arguments
+args = parser.parse_args()
+
+if os.path.isfile(args.model):
+    print(f"The model '{args.model}' already exists.")
+    sys.exit(1)
 
 # Constants
 width = 128
@@ -18,7 +31,7 @@ input_channels = 1
 battle_area = (360, 180, 300, 320)
 boss_blood_area = (59, 90, 212, 475)
 player_blood_area = (53, 560, 305, 5)
-EPISODES = 300
+EPISODES = 10
 episode_count = 0
 input_dims = (input_channels, height, width)
 n_actions = 7
@@ -26,9 +39,11 @@ batch_size = 16
 gamma = 0.99
 lr = 0.003
 epsilon = 1.0
-file_path = 'model/test_model_6.pth'
 save_frequency = 5
 paused = True
+episode_numbers = []
+average_rewards = []
+file_path = args.model
 
 def check_pause(paused_flag):
     """
@@ -70,21 +85,21 @@ def wait_for_sekiro_window():
             time.sleep(1)
 
 
-def plot_graph(episode_numbers, average_rewards):
-    plt.figure(figsize=(10, 5))  # This will set the figure size. You can adjust if needed.
+def plot_graph(episode_number, average_reward):
+    plt.figure(figsize=(10, 5))  # Set the figure size once, not twice
 
-    # x is the episode number, y is the total reward
-    plt.figure(figsize=(10, 5))
-    plt.plot(episode_numbers, average_rewards, label='Average Reward', color='blue')
+    plt.plot(episode_number, average_reward, label='Average Reward', color='blue')
     plt.title('Average Reward per Episode')
     plt.xlabel('Episode Number')
     plt.ylabel('Average Reward')
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
+    plt.savefig(f'graph/average_rewards_per_episode_{len(episode_number)}.png')
     plt.show()
 
 if __name__ == '__main__':
+    torch.autograd.set_detect_anomaly(True)
     logging.basicConfig(level=logging.INFO)
     wait_for_sekiro_window()
     agent = Agent(gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions)
@@ -93,12 +108,12 @@ if __name__ == '__main__':
     for episode in range(EPISODES):
         ic.disable()
 
-        if detect.is_unwanted_state():
-            if detect.is_eob():
-                print('Boss defeated, saving model...')
-                agent.save_model(file_path)
-                plot_graph(episode_count, rewards)
-                sys.exit(0)
+        # if detect.is_unwanted_state():
+        #     if detect.is_eob():
+        #         print('Boss defeated, saving model...')
+        #         agent.save_model(file_path)
+        #         plot_graph(episode_count, rewards)
+        #         sys.exit(0)
 
         done = False
         total_reward = 0
@@ -112,25 +127,22 @@ if __name__ == '__main__':
 
             action = agent.choose_action(state[0])
             next_state, reward, done, _ = env.step(action)
-            print(next_state[0].shape)
             reshaped_next_state_0 = next_state[0].reshape(input_channels, 128, 128)
             agent.store_data(reshaped_state_0, action, reward, reshaped_next_state_0, done)
             agent.learn()
             state = next_state
             total_reward += reward
 
-            rewards.append(total_reward)
             round_count += 1
-
             episode_count = episode + 1
+
+        average_reward_per_episode = total_reward / round_count
+        average_rewards.append(average_reward_per_episode)
+        episode_numbers.append(episode + 1)
 
         if episode % save_frequency == 0:  # Save the model after every 10 episodes
             agent.save_model(file_path)
 
         average_reward_per_episode = total_reward / round_count
         print(f'Episode: {episode}, Average Reward: {average_reward_per_episode}')  # Print the reward for this episode
-
-
-
-
-
+    plot_graph(episode_numbers, average_rewards)
