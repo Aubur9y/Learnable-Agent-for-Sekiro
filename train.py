@@ -85,7 +85,7 @@ def wait_for_sekiro_window():
             time.sleep(1)
 
 
-def plot_graph(episode_number, average_reward):
+def plot_graph(episode_number, average_reward, learning_rate=lr):
     plt.figure(figsize=(10, 5))  # Set the figure size once, not twice
 
     plt.plot(episode_number, average_reward, label='Average Reward', color='blue')
@@ -95,7 +95,7 @@ def plot_graph(episode_number, average_reward):
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(f'graph/average_rewards_per_episode_{len(episode_number)}.png')
+    plt.savefig(f'graph/average_rewards_per_episode_{len(episode_number)}_{learning_rate}.png')
     plt.show()
 
 if __name__ == '__main__':
@@ -145,4 +145,4 @@ if __name__ == '__main__':
 
         average_reward_per_episode = total_reward / round_count
         print(f'Episode: {episode}, Average Reward: {average_reward_per_episode}')  # Print the reward for this episode
-    plot_graph(episode_numbers, average_rewards)
+    plot_graph(episode_numbers, average_rewards, lr)

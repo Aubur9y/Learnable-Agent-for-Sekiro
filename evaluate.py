@@ -110,7 +110,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     wait_for_sekiro_window()
     agent = Agent(gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions)
-    agent.load_model(file_path)
+    agent.load_model(input_file_path)
     env = SekiroEnv()
     rewards = []  # this is used to plot graph in the end
     for episode in range(EPISODES):
@@ -149,7 +149,7 @@ if __name__ == '__main__':
         episode_numbers.append(episode + 1)
 
         if episode % save_frequency == 0:  # Save the model after every 10 episodes
-            agent.save_model(file_path)
+            agent.save_model(output_file_path)
 
         average_reward_per_episode = total_reward / round_count
         print(f'Episode: {episode}, Average Reward: {average_reward_per_episode}')  # Print the reward for this episode
