@@ -33,6 +33,7 @@ boss_blood_area = (59, 90, 212, 475)
 player_blood_area = (53, 560, 305, 5)
 EPISODES = 10
 episode_count = 0
+round_count_for_graph = 0
 input_dims = (input_channels, height, width)
 n_actions = 7
 batch_size = 16
@@ -44,6 +45,31 @@ paused = True
 episode_numbers = []
 average_rewards = []
 file_path = args.model
+
+class RealTimeGraph:
+    def __init__(self):
+        self.fig, self.ax = plt.subplots()
+        self.x_data, self.y_data = [], []
+        self.line, = self.ax.plot(self.x_data, self.y_data, color='blue', linewidth=2, linestyle='-', label='Reward')
+        self.ax.set_title('Real-time Reward Tracking')
+        self.ax.set_xlabel('Action Number')
+        self.ax.set_ylabel('Reward')
+        self.ax.legend()
+        self.ax.grid(True)
+        plt.ion()
+        plt.show()
+
+    def update(self, new_x, new_y):
+        self.x_data.append(new_x)
+        self.y_data.append(new_y)
+        self.line.set_data(self.x_data, self.y_data)
+        self.ax.relim()
+        self.ax.autoscale_view()
+        plt.draw()
+        plt.pause(0.01)
+
+# Instantiate the graph object
+real_time_graph = RealTimeGraph()
 
 def check_pause(paused_flag):
     """
@@ -98,6 +124,7 @@ def plot_graph(episode_number, average_reward, learning_rate=lr):
     plt.savefig(f'graph/average_rewards_per_episode_{len(episode_number)}_{learning_rate}.png')
     plt.show()
 
+
 if __name__ == '__main__':
     torch.autograd.set_detect_anomaly(True)
     logging.basicConfig(level=logging.INFO)
@@ -135,6 +162,9 @@ if __name__ == '__main__':
 
             round_count += 1
             episode_count = episode + 1
+            round_count_for_graph += 1
+
+            real_time_graph.update(round_count_for_graph, reward)
 
         average_reward_per_episode = total_reward / round_count
         average_rewards.append(average_reward_per_episode)
