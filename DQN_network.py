@@ -175,6 +175,8 @@ class Agent:
 
         self.epsilon = max(self.eps_min, self.epsilon - self.eps_dec)
 
+        return loss.item()
+
     def update_target_network(self):
         """ Update the target network with the weights and biases from the evaluation network"""
         self.Q_target.load_state_dict(self.Q_eval.state_dict())

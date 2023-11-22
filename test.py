@@ -1,14 +1,11 @@
 import json
 import sys
 import logging
-import torch
-import argparse
 import keyboardAction
 import time
 import keyboard
 import pygetwindow as gw
 import matplotlib.pyplot as plt
-import os
 from DQN_network import Agent
 from env import SekiroEnv
 from icecream import ic
@@ -176,4 +173,3 @@ if __name__ == '__main__':
     plt.grid(True)
     plt.tight_layout()
     plt.show()
-

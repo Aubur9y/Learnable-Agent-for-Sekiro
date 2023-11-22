@@ -11,6 +11,10 @@ import os
 from DQN_network import Agent
 from env import SekiroEnv
 from icecream import ic
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import tkinter as Tk
+
+plt.style.use('seaborn-v0_8-darkgrid')
 
 parser = argparse.ArgumentParser(
     usage='''python3 train.py model/{model name}.pth'''
@@ -47,29 +51,43 @@ average_rewards = []
 file_path = args.model
 
 class RealTimeGraph:
-    def __init__(self):
+    def __init__(self, title, x_label, y_label, color, position, log_scale=False):
+        self.root = Tk.Tk()
+        self.root.geometry(position)  # Positions the window
+
         self.fig, self.ax = plt.subplots()
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
+        self.canvas.get_tk_widget().pack(side=Tk.TOP, fill=Tk.BOTH, expand=1)
+
+        if log_scale:
+            self.ax.set_yscale('log')
+
         self.x_data, self.y_data = [], []
-        self.line, = self.ax.plot(self.x_data, self.y_data, color='blue', linewidth=2, linestyle='-', label='Reward')
-        self.ax.set_title('Real-time Reward Tracking')
-        self.ax.set_xlabel('Action Number')
-        self.ax.set_ylabel('Reward')
-        self.ax.legend()
+        self.line, = self.ax.plot(self.x_data, self.y_data, color=color, linewidth=2, linestyle='-')
+        self.ax.set_title(title)
+        self.ax.set_xlabel(x_label)
+        self.ax.set_ylabel(y_label)
         self.ax.grid(True)
-        plt.ion()
-        plt.show()
+
+        # self.canvas.draw()
+        # plt.ion()
+        # self.root.update()
 
     def update(self, new_x, new_y):
         self.x_data.append(new_x)
+        if torch.is_tensor(new_y):  # Check if new_y is a tensor
+            new_y = new_y.detach().numpy()  # Detach and convert to numpy
         self.y_data.append(new_y)
         self.line.set_data(self.x_data, self.y_data)
         self.ax.relim()
         self.ax.autoscale_view()
-        plt.draw()
-        plt.pause(0.01)
+        self.canvas.draw()
+        self.root.update()
 
-# Instantiate the graph object
-real_time_graph = RealTimeGraph()
+# Instantiate two graph objects
+reward_graph = RealTimeGraph('Real-time Reward Tracking', 'Action Number', 'Reward', 'blue', '+0+800')
+loss_graph = RealTimeGraph('Real-time Loss Tracking', 'Training Step', 'Loss', 'red', '+700+800', log_scale=True)
+
 
 def check_pause(paused_flag):
     """
@@ -156,7 +174,7 @@ if __name__ == '__main__':
             next_state, reward, done, _ = env.step(action)
             reshaped_next_state_0 = next_state[0].reshape(input_channels, 128, 128)
             agent.store_data(reshaped_state_0, action, reward, reshaped_next_state_0, done)
-            agent.learn()
+            loss = agent.learn()
             state = next_state
             total_reward += reward
 
@@ -164,7 +182,9 @@ if __name__ == '__main__':
             episode_count = episode + 1
             round_count_for_graph += 1
 
-            real_time_graph.update(round_count_for_graph, reward)
+            reward_graph.update(round_count_for_graph, reward)
+            if loss is not None:
+                loss_graph.update(round_count_for_graph, loss)
 
         average_reward_per_episode = total_reward / round_count
         average_rewards.append(average_reward_per_episode)
