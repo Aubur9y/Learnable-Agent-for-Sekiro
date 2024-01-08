@@ -1,16 +1,18 @@
 import sys
 import logging
+
+import neptune
 import torch
 import argparse
 import keyboardAction
 import time
-import keyboard
+from env import keyboard
 import pygetwindow as gw
 import matplotlib.pyplot as plt
 import os
-from DQN_network import Agent
+from DQN_network import DQN_Agent
+from DuellingDQN_network import DeullingDQN_Agent
 from env import SekiroEnv
-from icecream import ic
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import tkinter as Tk
 
@@ -29,26 +31,29 @@ if os.path.isfile(args.model):
     sys.exit(1)
 
 # Constants
-width = 128
-height = 128
-input_channels = 1
-battle_area = (360, 180, 300, 320)
-boss_blood_area = (59, 90, 212, 475)
-player_blood_area = (53, 560, 305, 5)
-EPISODES = 10
+width = 224
+height = 224
+input_channels = 3
+EPISODES = 100
 episode_count = 0
 round_count_for_graph = 0
-input_dims = (input_channels, height, width)
 n_actions = 7
-batch_size = 16
+batch_size = 64
 gamma = 0.99
-lr = 0.003
-epsilon = 1.0
+lr = 0.0003
+epsilon = 1
 save_frequency = 5
 paused = True
 episode_numbers = []
 average_rewards = []
 file_path = args.model
+model_used = 'DQN'  # DQN or Duelling_DQN
+
+# initialize neptune which is used for live tracking
+run = neptune.init_run(
+    project="aubury/sekiro",
+    api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiI2MTAyMTdhMS03YWRmLTQ4YzUtYTE5Zi0yYTU2OTQxNzVkM2QifQ==",
+)
 
 class RealTimeGraph:
     def __init__(self, title, x_label, y_label, color, position, log_scale=False):
@@ -69,10 +74,6 @@ class RealTimeGraph:
         self.ax.set_ylabel(y_label)
         self.ax.grid(True)
 
-        # self.canvas.draw()
-        # plt.ion()
-        # self.root.update()
-
     def update(self, new_x, new_y):
         self.x_data.append(new_x)
         if torch.is_tensor(new_y):  # Check if new_y is a tensor
@@ -89,32 +90,32 @@ reward_graph = RealTimeGraph('Real-time Reward Tracking', 'Action Number', 'Rewa
 loss_graph = RealTimeGraph('Real-time Loss Tracking', 'Training Step', 'Loss', 'red', '+700+800', log_scale=True)
 
 
-def check_pause(paused_flag):
-    """
-    Toggles the paused flag when 'p' is pressed.
-    Returns the updated paused state.
-    """
-    if keyboard.is_pressed('p'):
-        paused_flag = not paused_flag  # Toggle the paused state
-        print("Game is {}".format("paused" if paused_flag else "starting"))
-        print("Press 'p' to {}".format("continue" if paused_flag else "pause"))
-        time.sleep(2)  # has to wait for current motion to end in order to pause
-        # Wait for the 'p' key to be released before proceeding
-        keyboardAction.esc()
-
-    if paused_flag:
-        print("Game is paused, press 'T' to stop the program")
-        while not keyboard.is_pressed('p'):
-            time.sleep(0.1)
-            if keyboard.is_pressed('t'):
-                print('stopping program')
-                sys.exit(0)
-        paused_flag = False
-        print("Game is starting")
-        time.sleep(0.1)
-        keyboardAction.esc()
-
-    return paused_flag
+# def check_pause(paused_flag):
+#     """
+#     Toggles the paused flag when 'p' is pressed.
+#     Returns the updated paused state.
+#     """
+#     if keyboard.is_pressed('p'):
+#         paused_flag = not paused_flag  # Toggle the paused state
+#         print("Game is {}".format("paused" if paused_flag else "starting"))
+#         print("Press 'p' to {}".format("continue" if paused_flag else "pause"))
+#         time.sleep(2)  # has to wait for current motion to end in order to pause
+#         # Wait for the 'p' key to be released before proceeding
+#         keyboardAction.esc()
+#
+#     if paused_flag:
+#         print("Game is paused, press 'T' to stop the program")
+#         while not keyboard.is_pressed('p'):
+#             time.sleep(0.1)
+#             if keyboard.is_pressed('t'):
+#                 print('stopping program')
+#                 sys.exit(0)
+#         paused_flag = False
+#         print("Game is starting")
+#         time.sleep(0.1)
+#         keyboardAction.esc()
+#
+#     return paused_flag
 
 
 def wait_for_sekiro_window():
@@ -144,37 +145,48 @@ def plot_graph(episode_number, average_reward, learning_rate=lr):
 
 
 if __name__ == '__main__':
-    torch.autograd.set_detect_anomaly(True)
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s %(levelname)s %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
     wait_for_sekiro_window()
-    agent = Agent(gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions)
+
+    if model_used == 'Duelling_Dqn':
+        agent = DeullingDQN_Agent(gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions)
+    else:
+        agent = DQN_Agent(gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions)
     env = SekiroEnv()
+
     rewards = []  # this is used to plot graph in the end
+
     for episode in range(EPISODES):
-        ic.disable()
-
-        # if detect.is_unwanted_state():
-        #     if detect.is_eob():
-        #         print('Boss defeated, saving model...')
-        #         agent.save_model(file_path)
-        #         plot_graph(episode_count, rewards)
-        #         sys.exit(0)
-
         done = False
         total_reward = 0
         round_count = 0
 
         state = env.reset()  # img, agent_hp, agent_ep, boss_hp
-        reshaped_state_0 = state[0].reshape(input_channels, 128, 128)
+        reshaped_state_0 = state[0].reshape(input_channels, width, height)
 
         while not done:
-            paused = check_pause(False)
+            # paused = check_pause(False)
 
-            action = agent.choose_action(state[0])
-            next_state, reward, done, _ = env.step(action)
-            reshaped_next_state_0 = next_state[0].reshape(input_channels, 128, 128)
+            action = agent.choose_action(reshaped_state_0)
+            next_state, reward, done = env.step(action)
+            reshaped_next_state_0 = next_state[0].reshape(input_channels, width, height)
+
+            logging.debug(f"state shape: {next_state[0].shape}")
+            logging.debug(f"reshaped state shape: {reshaped_next_state_0.shape}")
+
             agent.store_data(reshaped_state_0, action, reward, reshaped_next_state_0, done)
             loss = agent.learn()
+
+            run["train/batch/reward"].append(reward)
+            run["train/batch/loss"].append(loss)
+
+            logging.info(f"action: {action}, reward: {reward}, done: {done}")
+
             state = next_state
             total_reward += reward
 
@@ -190,9 +202,12 @@ if __name__ == '__main__':
         average_rewards.append(average_reward_per_episode)
         episode_numbers.append(episode + 1)
 
+        run["train/episode/average reward per episode"].append(average_reward_per_episode)
+
         if episode % save_frequency == 0:  # Save the model after every 10 episodes
             agent.save_model(file_path)
 
         average_reward_per_episode = total_reward / round_count
         print(f'Episode: {episode}, Average Reward: {average_reward_per_episode}')  # Print the reward for this episode
-    plot_graph(episode_numbers, average_rewards, lr)
+    # plot_graph(episode_numbers, average_rewards, lr)
+    run.stop()

@@ -6,14 +6,13 @@ import copy
 import numpy as np
 import logging
 
-
-class DQNnetwork(nn.Module):
+class DuellingDQN(nn.Module):
     def __init__(self, lr, input_channels, n_actions, height, width):
-        super(DQNnetwork, self).__init__()
+        super(DuellingDQN, self).__init__()
 
-        logging.info("Initializing DQN network")
         kernel_size = (5, 5)
 
+        # same as dqn network
         self.cnn_layer = nn.Sequential(
             nn.Conv2d(input_channels, 32, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2)),
             nn.ReLU(),
@@ -23,7 +22,20 @@ class DQNnetwork(nn.Module):
             nn.MaxPool2d((2, 2), stride=(2, 2)),
         )
 
-        self.dense_layer = nn.Sequential(
+        # same structure as the dqn network but output is 1 instead of n_actions
+        self.value_stream = nn.Sequential(
+            nn.Flatten(start_dim=1),
+            nn.Linear(64 * (height // 4) * (width // 4), 512),
+            nn.ReLU(),
+            nn.Dropout(p=0.2),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Dropout(p=0.2),
+            nn.Linear(256, 1),
+        )
+
+        # output n_actions
+        self.advantage_stream = nn.Sequential(
             nn.Flatten(start_dim=1),
             nn.Linear(64 * (height // 4) * (width // 4), 512),
             nn.ReLU(),
@@ -34,56 +46,29 @@ class DQNnetwork(nn.Module):
             nn.Linear(256, n_actions),
         )
 
-        # self.conv1 = nn.Conv2d(input_channels, 32, kernel_size, stride=4, padding=2)
-        # self.conv2 = nn.Conv2d(32, 64, kernel_size, stride=2, padding=2)
-        # self.conv3 = nn.Conv2d(64, 128, kernel_size, stride=1, padding=2)
-        # self.fc1_input_dims = self.get_conv_output_dims((height, width))
-        #
-        # self.fc1 = nn.Linear(self.fc1_input_dims, 512)
-        # self.dropout = nn.Dropout(p=0.3)
-        # self.fc2 = nn.Linear(512, 256)
-        # self.fc3 = nn.Linear(256, n_actions)
-        #
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
         self.loss = nn.HuberLoss()
+        """
+        loss = 1/2 * a**2 if |a| < threshold 
+        or threshold * (|a| - 1/2 * threshold) otherwise
+        """
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
 
     def forward(self, state):
         x = self.cnn_layer(state)
-        actions = self.dense_layer(x)
-        return actions
-        # x = F.relu(self.conv1(state))
-        # x = F.max_pool2d(x, kernel_size=2)
-        # x = F.relu(self.conv2(x))
-        # x = F.max_pool2d(x, kernel_size=2)
-        # x = F.relu(self.conv3(x))
-        #
-        # x = x.view(x.size(0), -1)
-        #
-        # x = F.relu(self.fc1(x))  # Batch normalization
-        # x = self.dropout(x)
-        # x = F.relu(self.fc2(x))  # Batch normalization
-        # x = self.dropout(x)
-        # actions = self.fc3(x)
-        # return actions
 
-    def get_conv_output_dims(self, input_dims):
-        """ This method is used to calculate the output dimension of the convolutional layers,
-        instead of calculateing the value using formula, I simulate the operations of convolutional layers"""
-        with torch.no_grad():
-            x = torch.zeros(1, self.conv1.in_channels, *input_dims)
-            x = self.conv1(x)  # simulate the operations of convolutional layer
-            x = F.max_pool2d(x, kernel_size=2)  # simulate the operations of max pooling layer
-            x = self.conv2(x)
-            x = F.max_pool2d(x, kernel_size=2)
-            x = self.conv3(x)
-            return int(np.prod(x.size()[1:]))  # this gives the total number of elements in the output tensor,
-            # channels * width * height
-            # the [1:] is to exclude the batch dimension
+        # define the value stream
+        v = self.value_stream(x)
 
+        # define the advantage stream
+        a = self.advantage_stream(x)
 
-class DQN_Agent:
+        # combine stream
+        q_values = v + (a - a.mean(dim=1, keepdim=True))
+        return q_values
+
+class DeullingDQN_Agent:
     def __init__(self, gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions,
                  max_mem_size=15000, eps_end=0.01, eps_dec=5e-4, target_update=200):
         self.gamma = gamma
@@ -99,10 +84,10 @@ class DQN_Agent:
         self.target_update = target_update  # how often to update the target network
         self.learn_step_counter = 0  # count how many steps we have taken so far
 
-        self.Q_eval = DQNnetwork(lr, input_channels, n_actions, height, width)
+        self.Q_eval = DuellingDQN(lr, input_channels, n_actions, height, width)
         self.Q_eval.to(self.Q_eval.device)
 
-        self.Q_target = DQNnetwork(lr, input_channels, n_actions, height, width)
+        self.Q_target = DuellingDQN(lr, input_channels, n_actions, height, width)
         self.Q_target.load_state_dict(self.Q_eval.state_dict())
         self.Q_target.to(self.Q_target.device)
         self.Q_target.eval()
@@ -146,11 +131,10 @@ class DQN_Agent:
         return action
 
     def learn(self):
-        """ Update the weights and biases of the evaluation network"""
         if self.mem_cntr < self.batch_size:
             return
 
-        self.Q_eval.optimizer.zero_grad()  # start off with zero gradient
+        self.Q_eval.optimizer.zero_grad()
 
         max_mem = min(self.mem_cntr, self.mem_size)  # choose a subset of all memory
         batch = np.random.choice(max_mem, self.batch_size, replace=False)
@@ -164,15 +148,9 @@ class DQN_Agent:
 
         action_batch = self.action_memory[batch]
 
-        # Computer current Q-values according to the evaluation network
         q_eval = self.Q_eval.forward(state_batch)[batch_index, action_batch]
-        # Compute the Q-values of the next states according to the target network,
-        # the reason I use the target network is to avoid the moving target problem
         q_next = self.Q_target.forward(next_state_batch)
 
-        # Use a mask to compute the Q-values of non-terminal states
-        # and avoid modifying q_next in-place
-        # This step computes the largest Q-value of the next state
         q_next_values = torch.zeros_like(q_next.max(1)[0])
         q_next_values[~terminal_batch] = q_next[~terminal_batch].max(1)[0].detach()
 
@@ -188,7 +166,6 @@ class DQN_Agent:
 
         loss.backward()
 
-        # Update the target network once a while, this is to avoid the moving target problem
         if self.learn_step_counter % self.target_update == 0:
             self.update_target_network()
 
