@@ -297,7 +297,7 @@ class Memory():
             agent_ep = self.pm.read_int(agent_mem_addr + 0x148)
             boss_mem_addr = self.boss_mem_ptr()
             boss_hp = self.pm.read_int(boss_mem_addr + 0x130)
-            return (agent_hp / MAX_AGENT_HP, agent_ep / MAX_AGENT_EP, boss_hp / MAX_BOSS_HP)
+            return agent_hp / MAX_AGENT_HP, agent_ep / MAX_AGENT_EP, boss_hp / MAX_BOSS_HP
         except Exception as e:
             logging.critical(e)
             self.restoreMemory()

@@ -11,7 +11,6 @@ Changes I made:
 
 import logging
 import time
-from typing import List
 
 from utils import timeLog
 from .env_config import AGENT_KEYMAP, ENV_KEYMAP, PRESS_RELEASE_DELAY
@@ -23,7 +22,6 @@ class Actor:
         self.agent_keymap = AGENT_KEYMAP
         self.env_keymap = ENV_KEYMAP
 
-    @timeLog
     def _performAction(self, key: str, keymap: dict, log_type: str, action_delay: float = 0):
         if key not in keymap:
             logging.critical(f"Invalid {log_type} action: {key}")
@@ -45,11 +43,9 @@ class Actor:
 
         time.sleep(action_delay)
 
-    @timeLog
     def agentAction(self, key: str, action_delay: float = 0) -> None:
         self._performAction(key, self.agent_keymap, "agent", action_delay)
 
-    @timeLog
     def envAction(self, key: str, action_delay: float = 0) -> None:
         self._performAction(key, self.env_keymap, "env", action_delay)
 

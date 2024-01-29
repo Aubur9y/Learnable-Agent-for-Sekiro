@@ -47,15 +47,22 @@ class SekiroEnv:
         return list(range(len(AGENT_KEYMAP)))
 
     def __calculate_reward(self, agent_hp: float, agent_ep: float, boss_hp: float) -> float:
-        rewards = np.array([
-            agent_hp - self.last_agent_hp,
-            self.last_boss_hp - boss_hp if boss_hp <= self.last_boss_hp else self.last_boss_hp + 1 - boss_hp
-        ])
-        weights = np.array([10, 200])
-        return weights.dot(rewards).item()
+        """
+        reward = 200 * (agent_hp - last_agent_hp) + 1000 * (last_boss_hp - boss_hp) + 50 * min(0, last_agent_ep - agent_ep)
+        if agent is dead then reward = -200 * last_agent_hp
+        """
+        rewards = np.array(
+            [agent_hp - self.last_agent_hp,
+             self.last_boss_hp - boss_hp,
+             min(0.0, self.last_agent_ep - agent_ep)]
+        )
+        weights = np.array([200, 1000, 50])
+        reward = weights.dot(rewards).item()
+        reward = -200 * self.last_agent_hp if agent_hp == 0 else reward
 
-    @timeLog
-    def step(self, action: int) -> Tuple[Tuple[npt.NDArray[np.uint8], float, float, float], float, bool, None]:
+        return reward
+
+    def step(self, action: int) -> Tuple[Tuple[npt.NDArray[np.uint8], float, float, float], float, bool]:
         """
         Perform the action and observe the result.
 
@@ -63,7 +70,6 @@ class SekiroEnv:
             state (Tuple): The state which consists of the screenshot, agent hp, agent ep, and boss hp.
             reward (float): The reward for performing the action.
             done (bool): Whether the agent is done with its actions.
-            info (None): Placeholder for additional info, not used currently.
         """
         self.memory.resetEndurance()
 
@@ -87,7 +93,7 @@ class SekiroEnv:
         logging.info(f"agent hp: {agent_hp:.4f}, agent ep: {agent_ep:.4f}, boss hp: {boss_hp:.4f}")
         logging.info(f"reward: {reward:<.2f}, done: {done}")
 
-        return state, reward, done, None
+        return state, reward, done
 
     def __handle_boss_death(self, boss_hp: float) -> float:
         if boss_hp < 0.1:

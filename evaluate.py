@@ -1,4 +1,3 @@
-"""run the program: python3 train.py --model model/{model name}.pth"""
 import sys
 import logging
 import torch
@@ -37,7 +36,7 @@ input_channels = 1
 battle_area = (360, 180, 300, 320)
 boss_blood_area = (59, 90, 212, 475)
 player_blood_area = (53, 560, 305, 5)
-EPISODES = 10
+EPISODES = 200
 episode_count = 0
 input_dims = (input_channels, height, width)
 n_actions = 7

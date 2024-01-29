@@ -1,6 +1,5 @@
 import sys
 import logging
-
 import neptune
 import torch
 import argparse
@@ -30,12 +29,11 @@ if os.path.isfile(args.model):
     print(f"The model '{args.model}' already exists.")
     sys.exit(1)
 
-# Constants
+# Constants for DQN and Duelling DQN
 width = 224
 height = 224
 input_channels = 3
 EPISODES = 100
-episode_count = 0
 round_count_for_graph = 0
 n_actions = 7
 batch_size = 64
@@ -48,6 +46,9 @@ episode_numbers = []
 average_rewards = []
 file_path = args.model
 model_used = 'DQN'  # DQN or Duelling_DQN
+
+# Constants for PPO
+
 
 # initialize neptune which is used for live tracking
 run = neptune.init_run(
@@ -155,8 +156,11 @@ if __name__ == '__main__':
 
     if model_used == 'Duelling_Dqn':
         agent = DeullingDQN_Agent(gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions)
-    else:
+    elif model_used == 'DQN':
         agent = DQN_Agent(gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions)
+    else:
+        pass
+
     env = SekiroEnv()
 
     rewards = []  # this is used to plot graph in the end
@@ -165,6 +169,7 @@ if __name__ == '__main__':
         done = False
         total_reward = 0
         round_count = 0
+        q_val_list = []
 
         state = env.reset()  # img, agent_hp, agent_ep, boss_hp
         reshaped_state_0 = state[0].reshape(input_channels, width, height)
@@ -172,7 +177,7 @@ if __name__ == '__main__':
         while not done:
             # paused = check_pause(False)
 
-            action = agent.choose_action(reshaped_state_0)
+            action, q_val = agent.choose_action(reshaped_state_0)
             next_state, reward, done = env.step(action)
             reshaped_next_state_0 = next_state[0].reshape(input_channels, width, height)
 
@@ -190,8 +195,8 @@ if __name__ == '__main__':
             state = next_state
             total_reward += reward
 
+            q_val_list.append(q_val)
             round_count += 1
-            episode_count = episode + 1
             round_count_for_graph += 1
 
             reward_graph.update(round_count_for_graph, reward)
@@ -199,10 +204,12 @@ if __name__ == '__main__':
                 loss_graph.update(round_count_for_graph, loss)
 
         average_reward_per_episode = total_reward / round_count
-        average_rewards.append(average_reward_per_episode)
-        episode_numbers.append(episode + 1)
+        average_q_val = sum(q_val_list) / len(q_val_list)
+        # average_rewards.append(average_reward_per_episode)
+        # episode_numbers.append(episode + 1)
 
         run["train/episode/average reward per episode"].append(average_reward_per_episode)
+        run["train/episode/average q value"].append(average_q_val)
 
         if episode % save_frequency == 0:  # Save the model after every 10 episodes
             agent.save_model(file_path)
