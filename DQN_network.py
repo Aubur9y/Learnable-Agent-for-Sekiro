@@ -186,6 +186,8 @@ class DQN_Agent:
         # I use the loss value to update the weights and biases of the evaluation network
         loss = self.Q_eval.loss(q_eval, q_target)
 
+        return_loss = loss
+
         logging.info(f"loss: {loss}")
 
         loss.backward()
@@ -201,7 +203,7 @@ class DQN_Agent:
 
         logging.info(f"epsilon: {self.epsilon}")
 
-        return loss.item()
+        return return_loss
 
     def update_target_network(self):
         """ Update the target network with the weights and biases from the evaluation network"""

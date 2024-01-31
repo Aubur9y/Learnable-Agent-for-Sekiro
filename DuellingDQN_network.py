@@ -120,15 +120,17 @@ class DeullingDQN_Agent:
             # and send to device
             actions = self.Q_eval.forward(state)
 
+            q_val = torch.max(actions)
             # greedy approach
             action = torch.argmax(actions).item()
 
             logging.info(f"Selected action: {action}")
         else:
+            q_val = 0
             action = np.random.choice(self.action_space)
             logging.info(f"Random action: {action}")
 
-        return action
+        return action, q_val
 
     def learn(self):
         if self.mem_cntr < self.batch_size:

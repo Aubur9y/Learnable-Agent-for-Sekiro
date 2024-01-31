@@ -33,7 +33,7 @@ if os.path.isfile(args.model):
 width = 224
 height = 224
 input_channels = 3
-EPISODES = 100
+EPISODES = 200
 round_count_for_graph = 0
 n_actions = 7
 batch_size = 64
@@ -45,7 +45,7 @@ paused = True
 episode_numbers = []
 average_rewards = []
 file_path = args.model
-model_used = 'DQN'  # DQN or Duelling_DQN
+model_used = 'Duelling_DQN'  # DQN or Duelling_DQN
 
 # Constants for PPO
 
@@ -154,12 +154,13 @@ if __name__ == '__main__':
 
     wait_for_sekiro_window()
 
-    if model_used == 'Duelling_Dqn':
+    if model_used == 'Duelling_DQN':
         agent = DeullingDQN_Agent(gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions)
     elif model_used == 'DQN':
         agent = DQN_Agent(gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions)
     else:
-        pass
+        print("Model not found")
+        sys.exit(1)
 
     env = SekiroEnv()
 
@@ -187,8 +188,8 @@ if __name__ == '__main__':
             agent.store_data(reshaped_state_0, action, reward, reshaped_next_state_0, done)
             loss = agent.learn()
 
-            run["train/batch/reward"].append(reward)
-            run["train/batch/loss"].append(loss)
+            run["dqn/train/batch/reward"].append(reward)
+            run["dqn/train/batch/loss"].append(loss)
 
             logging.info(f"action: {action}, reward: {reward}, done: {done}")
 
@@ -199,17 +200,17 @@ if __name__ == '__main__':
             round_count += 1
             round_count_for_graph += 1
 
-            reward_graph.update(round_count_for_graph, reward)
-            if loss is not None:
-                loss_graph.update(round_count_for_graph, loss)
+            # reward_graph.update(round_count_for_graph, reward)
+            # if loss is not None:
+            #     loss_graph.update(round_count_for_graph, loss)
 
         average_reward_per_episode = total_reward / round_count
         average_q_val = sum(q_val_list) / len(q_val_list)
         # average_rewards.append(average_reward_per_episode)
         # episode_numbers.append(episode + 1)
 
-        run["train/episode/average reward per episode"].append(average_reward_per_episode)
-        run["train/episode/average q value"].append(average_q_val)
+        run["dqn/train/episode/average reward per episode"].append(average_reward_per_episode)
+        run["dqn/train/episode/average q value"].append(average_q_val)
 
         if episode % save_frequency == 0:  # Save the model after every 10 episodes
             agent.save_model(file_path)

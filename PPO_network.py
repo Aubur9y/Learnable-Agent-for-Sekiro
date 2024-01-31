@@ -3,7 +3,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import neptune
 from torch.distributions.categorical import Categorical
+
+# run = neptune.init_run(
+#     project="aubury/sekiro",
+#     api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiI2MTAyMTdhMS03YWRmLTQ4YzUtYTE5Zi0yYTU2OTQxNzVkM2QifQ==",
+# )
 
 class PPOMemory:
     def __init__(self, batch_size):
@@ -26,6 +32,13 @@ class PPOMemory:
         return np.array(self.states), np.array(self.actions), np.array(self.probs), np.array(self.vals), np.array(self.rewards), np.array(self.dones), batches
 
     def store_memory(self, state, action, probs, vals, reward, done):
+        # if isinstance(state, (list, tuple)):
+        #     print(f"State is a {type(state)} with length {len(state)}")
+        #     for i, item in enumerate(state):
+        #         print(
+        #             f"Element {i}: Type={type(item)}, Shape={np.array(item).shape if isinstance(item, np.ndarray) else 'N/A'}")
+        # else:
+        #     print(f"State is not a list or tuple, Type={type(state)}")
         self.states.append(state)
         self.actions.append(action)
         self.probs.append(probs)
@@ -49,18 +62,25 @@ class ActorNetwork(nn.Module):
 
         kernel_size = (5, 5)
 
-        self.conv1 = nn.Conv2d(input_channels, 32, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2))
-        self.maxpool1 = nn.MaxPool2d((2, 2), stride=(2, 2))
-        self.dropout1 = nn.Dropout(p=0.2)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2))
-        self.maxpool2 = nn.MaxPool2d((2, 2), stride=(2, 2))
-        self.dropout2 = nn.Dropout(p=0.2)
+        self.cnn_layer = nn.Sequential(
+            nn.Conv2d(input_channels, 32, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2)),
+            nn.ReLU(),
+            nn.MaxPool2d((2, 2), stride=(2, 2)),
+            nn.Conv2d(32, 64, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2)),
+            nn.ReLU(),
+            nn.MaxPool2d((2, 2), stride=(2, 2)),
+        )
 
-        conv_output_size = self._calculate_conv_output_size(height, width)
+        # conv_output_size = self._calculate_conv_output_size(height, width)
 
-        self.fc = nn.Linear(conv_output_size, 256)
-
-        self.actor = nn.Sequential(
+        self.dense_layer = nn.Sequential(
+            nn.Flatten(start_dim=1),
+            nn.Linear(64 * (height // 4) * (width // 4), 512),
+            nn.ReLU(),
+            nn.Dropout(p=0.2),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Dropout(p=0.2),
             nn.Linear(256, n_actions),
             nn.Softmax(dim=-1)
         )
@@ -79,26 +99,29 @@ class ActorNetwork(nn.Module):
         self.to(self.device)
 
     def forward(self, state):
-        x = nn.ReLU()(self.conv1(state))
-        x = self.maxpool1(x)
-        x = self.dropout1(x)
-        x = nn.ReLU()(self.conv2(x))
-        x = self.maxpool2(x)
-        x = self.dropout2(x)
-        x = x.view(x.size(0), -1)  # Flatten
-        x = nn.ReLU()(self.fc(x))
-        dist = self.actor(x)
-        dist = Categorical(dist)
-        return dist
+        features = self.cnn_layer(state)
+        action_probs = self.dense_layer(features)
+        action_probs = Categorical(action_probs)
 
-    def _calculate_conv_output_size(self, height, width):
-        # This is a helper function to calculate the output size of the conv layers
-        # Assumes square kernel size and stride 1 for simplicity
-        output_height = height
-        output_width = width
-        output_height = output_height - 2  # Two conv layers with padding=1 maintain the size
-        output_width = output_width - 2
-        return output_height * output_width * 64  # 64 is the number of filters in the last conv layer
+        return action_probs
+
+    def _calculate_conv_output_size(self, height, width, kernel_size=5, stride=1, padding=2, pool_kernel_size=2,
+                                    pool_stride=2):
+        # Convolution 1
+        output_height = (height + 2 * padding - kernel_size) // stride + 1
+        output_width = (width + 2 * padding - kernel_size) // stride + 1
+        # MaxPool 1
+        output_height = (output_height - pool_kernel_size) // pool_stride + 1
+        output_width = (output_width - pool_kernel_size) // pool_stride + 1
+
+        # Convolution 2
+        output_height = (output_height + 2 * padding - kernel_size) // stride + 1
+        output_width = (output_width + 2 * padding - kernel_size) // stride + 1
+        # MaxPool 2
+        output_height = (output_height - pool_kernel_size) // pool_stride + 1
+        output_width = (output_width - pool_kernel_size) // pool_stride + 1
+
+        return output_height * output_width * 64  # 64 for the number of filters in the last conv layer
 
     def save_checkpoint(self):
         print('... saving checkpoint ...')
@@ -116,42 +139,53 @@ class CriticNetwork(nn.Module):
 
         kernel_size = (5, 5)
 
-        self.conv1 = nn.Conv2d(input_channels, 32, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2))
-        self.maxpool1 = nn.MaxPool2d((2, 2), stride=(2, 2))
-        self.dropout1 = nn.Dropout(p=0.2)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2))
-        self.maxpool2 = nn.MaxPool2d((2, 2), stride=(2, 2))
-        self.dropout2 = nn.Dropout(p=0.2)
+        self.cnn_layer = nn.Sequential(
+            nn.Conv2d(input_channels, 32, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2)),
+            nn.ReLU(),
+            nn.MaxPool2d((2, 2), stride=(2, 2)),
+            nn.Conv2d(32, 64, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2)),
+            nn.ReLU(),
+            nn.MaxPool2d((2, 2), stride=(2, 2)),
+        )
 
-        conv_output_size = self._calculate_conv_output_size(height, width)
+        # conv_output_size = self._calculate_conv_output_size(height, width)
 
-        self.fc1 = nn.Linear(conv_output_size, 256)
-        self.fc2 = nn.Linear(256, 1)
+        # self.fc1 = nn.Linear(conv_output_size, 256)
+        # self.fc2 = nn.Linear(256, 1)
+
+        self.dense_layer = nn.Sequential(
+            nn.Flatten(start_dim=1),
+            nn.Linear(64 * (height // 4) * (width // 4), 512),
+            nn.ReLU(),
+            nn.Linear(512, 1)
+        )
 
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
 
     def forward(self, state):
-        x = nn.ReLU()(self.conv1(state))
-        x = self.maxpool1(x)
-        x = self.dropout1(x)
-        x = nn.ReLU()(self.conv2(x))
-        x = self.maxpool2(x)
-        x = self.dropout2(x)
-        x = x.view(x.size(0), -1)
-        x = nn.ReLU()(self.fc1(x))
-        value = self.fc2(x)
+        features = self.cnn_layer(state)
+        value = self.dense_layer(features)
         return value
 
-    def _calculate_conv_output_size(self, height, width):
-        # This is a helper function to calculate the output size of the conv layers
-        # Assumes square kernel size and stride 1 for simplicity
-        output_height = height
-        output_width = width
-        output_height = output_height - 2  # Two conv layers with padding=1 maintain the size
-        output_width = output_width - 2
-        return output_height * output_width * 64  # 64 is the number of filters in the last conv layer
+    def _calculate_conv_output_size(self, height, width, kernel_size=5, stride=1, padding=2, pool_kernel_size=2,
+                                    pool_stride=2):
+        # Convolution 1
+        output_height = (height + 2 * padding - kernel_size) // stride + 1
+        output_width = (width + 2 * padding - kernel_size) // stride + 1
+        # MaxPool 1
+        output_height = (output_height - pool_kernel_size) // pool_stride + 1
+        output_width = (output_width - pool_kernel_size) // pool_stride + 1
+
+        # Convolution 2
+        output_height = (output_height + 2 * padding - kernel_size) // stride + 1
+        output_width = (output_width + 2 * padding - kernel_size) // stride + 1
+        # MaxPool 2
+        output_height = (output_height - pool_kernel_size) // pool_stride + 1
+        output_width = (output_width - pool_kernel_size) // pool_stride + 1
+
+        return output_height * output_width * 64  # 64 for the number of filters in the last conv layer
 
     def save_checkpoint(self):
         print('... saving checkpoint ...')
@@ -161,18 +195,18 @@ class CriticNetwork(nn.Module):
         print('... loading checkpoint ...')
         self.load_state_dict(torch.load(self.checkpoint_file))
 
-class Agent:
-    def __init__(self, n_actions, input_dims, gamma=0.99, lr=0.0003, gae_lambda=0.95, policy_clip=0.2, batch_size=64, N=2024, n_epoch=10):
+class PPO_Agent:
+    def __init__(self, n_actions, input_channels, height, width, gamma=0.99, lr=0.0003, gae_lambda=0.95, policy_clip=0.2, batch_size=64, N=2024, n_epoch=10):
         self.gamma = gamma
         self.policy_clip = policy_clip
         self.n_epoch = n_epoch
         self.gae_lambda = gae_lambda
 
-        self.actor = ActorNetwork(n_actions, input_dims, lr)
-        self.critic = CriticNetwork(input_dims, lr)
+        self.actor = ActorNetwork(n_actions, input_channels, lr, height, width)
+        self.critic = CriticNetwork(input_channels, lr, height, width)
         self.memory = PPOMemory(batch_size)
 
-    def remember(self, state, action, probs, vals, reward, done):
+    def store_data(self, state, action, probs, vals, reward, done):
         self.memory.store_memory(state, action, probs, vals, reward, done)
 
     def save_model(self):
@@ -183,8 +217,9 @@ class Agent:
         self.actor.load_checkpoint()
         self.critic.load_checkpoint()
 
-    def choose_action(self, observation):
-        state = torch.tensor([observation], dtype=torch.float).to(self.actor.device)
+    def choose_action(self, state):
+        state = torch.tensor(state, dtype=torch.float32).to(self.actor.device)
+        state = state.unsqueeze(0)
 
         dist = self.actor(state)
         value = self.critic(state)
@@ -193,6 +228,14 @@ class Agent:
         probs = torch.squeeze(dist.log_prob(action)).item()
         action = torch.squeeze(action).item()
         value = torch.squeeze(value).item()
+
+        # probs = dist.log_prob(action)
+        #
+        # val = self.critic(state)
+        #
+        # action = action.cpu.numpy()
+        # probs = probs.cpu().numpy()
+        # val = val.item()
 
         return action, probs, value
 
@@ -235,6 +278,8 @@ class Agent:
                 critic_loss = critic_loss.mean()
 
                 total_loss = actor_loss + 0.5 * critic_loss
+
+                # run["ppo/train/batch/loss"].append(total_loss)
 
                 self.actor.optimizer.zero_grad()
                 self.critic.optimizer.zero_grad()
