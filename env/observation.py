@@ -43,7 +43,7 @@ class Observer():
     def shotScreen(self) -> npt.NDArray[np.int16]:
         screen_shot = ImageGrab.grab(self.anchor)
         # NOTE: C x H x W, "RGB"
-        screen_shot = np.array(screen_shot, dtype=np.int16).transpose(2, 0, 1)
+        screen_shot = np.array(screen_shot, dtype=np.int16).transpose(2, 0, 1)  # I want to convert the screenshot to channel first so its easier for pytorch to process
         screen_shot = self.__select(screen_shot, SCREEN_ANCHOR)
 
         if screen_shot.shape[-2:] != SCREEN_SIZE:

@@ -113,7 +113,6 @@ if __name__ == '__main__':
     env = SekiroEnv()
     rewards = []  # this is used to plot graph in the end
     for episode in range(EPISODES):
-        ic.disable()
 
         # if detect.is_unwanted_state():
         #     if detect.is_eob():

@@ -26,6 +26,9 @@ from .observation import Observer
 
 
 class SekiroEnv:
+    boss_death_count = 0
+    player_death_count = 0
+
     def __init__(self) -> None:
         self.handle = self.__get_game_handle()
         self.actor = Actor()
@@ -51,14 +54,19 @@ class SekiroEnv:
         reward = 200 * (agent_hp - last_agent_hp) + 1000 * (last_boss_hp - boss_hp) + 50 * min(0, last_agent_ep - agent_ep)
         if agent is dead then reward = -200 * last_agent_hp
         """
+        time_penalty = -1
         rewards = np.array(
             [agent_hp - self.last_agent_hp,
              self.last_boss_hp - boss_hp,
              min(0.0, self.last_agent_ep - agent_ep)]
         )
-        weights = np.array([200, 1000, 50])
-        reward = weights.dot(rewards).item()
-        reward = -200 * self.last_agent_hp if agent_hp == 0 else reward
+        weights = np.array([40, 200, 10])
+        reward = weights.dot(rewards).item() + time_penalty
+        reward = -40 * self.last_agent_hp if agent_hp == 0 else reward
+
+        self.last_agent_hp = agent_hp
+        self.last_agent_ep = agent_ep
+        self.last_boss_hp = boss_hp
 
         return reward
 
@@ -97,8 +105,10 @@ class SekiroEnv:
 
     def __handle_boss_death(self, boss_hp: float) -> float:
         if boss_hp < 0.1:
+            self.boss_death_count += 1
             self.memory.reviveBoss()
             boss_hp = 1.00
+
         return boss_hp
 
     def __update_status(self, agent_hp: float, agent_ep: float, boss_hp: float) -> None:
@@ -108,6 +118,7 @@ class SekiroEnv:
 
     def __handle_agent_death(self, agent_hp: float) -> bool:
         if agent_hp == 0:
+            self.player_death_count += 1
             time.sleep(AGENT_DEAD_DELAY)
             self.memory.lockBoss()
             time.sleep(ROTATION_DELAY)
@@ -134,3 +145,9 @@ class SekiroEnv:
         win32gui.SendMessage(self.handle, win32con.WM_SYSCOMMAND, win32con.SC_RESTORE, 0)
         win32gui.SetForegroundWindow(self.handle)
         time.sleep(0.5)
+
+    def get_boss_death_count(self) -> int:
+        return self.boss_death_count
+
+    def get_player_death_count(self) -> int:
+        return self.player_death_count

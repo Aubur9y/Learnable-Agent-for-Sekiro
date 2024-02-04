@@ -6,6 +6,7 @@ import torch.optim as optim
 import neptune
 import logging
 from torch.distributions.categorical import Categorical
+from torchvision import models
 
 # run = neptune.init_run(
 #     project="aubury/sekiro",
@@ -61,79 +62,32 @@ class ActorNetwork(nn.Module):
 
         logging.info('Creating actor network...')
 
-        self.checkpoint_file = os.path.join(ckpt_dir, 'actor_torch_ppo')
+        self.base_model = models.resnet18(pretrained=True)
 
-        kernel_size = (5, 5)
+        self.checkpoint_file = os.path.join(ckpt_dir, 'actor_torch_ppo_tl')
 
-        # self.cnn_layer = nn.Sequential(
-        #     nn.Conv2d(input_channels, 32, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2)),
-        #     nn.ReLU(),
-        #     nn.MaxPool2d((2, 2), stride=(2, 2)),
-        #     nn.Conv2d(32, 64, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2)),
-        #     nn.ReLU(),
-        #     nn.MaxPool2d((2, 2), stride=(2, 2)),
-        # )
+        if input_channels != 3:
+            self.base_model.conv1 = nn.Conv2d(input_channels, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3),
+                                              bias=False)
 
-        self.cnn_layer = nn.Sequential(
-            nn.Conv2d(input_channels, 32, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(32),
+        num_features = self.base_model.fc.in_features
+        self.base_model.fc = nn.Sequential(
+            nn.Linear(num_features, 512),
             nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(64),
+            nn.Dropout(p=0.2),
+            nn.Linear(512, 256),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2)
-        )
-
-        conv_output_size = self._get_conv_output_shape((input_channels, height, width))
-
-        self.dense_layer = nn.Sequential(
-            nn.Linear(conv_output_size, 512),
-            nn.ReLU(),
-            nn.Linear(512, n_actions),
+            nn.Dropout(p=0.2),
+            nn.Linear(256, n_actions),
             nn.Softmax(dim=-1)
         )
-
-        # conv_output_size = self._calculate_conv_output_size(height, width)
-
-        # self.dense_layer = nn.Sequential(
-        #     nn.Flatten(start_dim=1),
-        #     nn.Linear(64 * (height // 4) * (width // 4), 512),
-        #     nn.ReLU(),
-        #     nn.Dropout(p=0.2),
-        #     nn.Linear(512, 256),
-        #     nn.ReLU(),
-        #     nn.Dropout(p=0.2),
-        #     nn.Linear(256, n_actions),
-        #     nn.Softmax(dim=-1)
-        # )
-
-        # self.actor = nn.Sequential(
-        #     nn.Linear(*input_dims, fc1_dim),
-        #     nn.ReLU(),
-        #     nn.Linear(fc1_dim, fc2_dim),
-        #     nn.ReLU(),
-        #     nn.Linear(fc2_dim, n_actions),
-        #     nn.Softmax(dim=-1)
-        # )
 
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
 
     def forward(self, state):
-        features = self.cnn_layer(state)
-        features = features.view(features.size(0), -1)  # Flatten the features
-        action_probs = self.dense_layer(features)
-        action_probs = Categorical(action_probs)
-        return action_probs
-
-    def _get_conv_output_shape(self, shape):
-        o = self.cnn_layer(torch.zeros(1, *shape))
-        return int(np.prod(o.size()))
+        return self.base_model(state)
 
     def save_checkpoint(self):
         print('... saving checkpoint ...')
@@ -149,46 +103,18 @@ class CriticNetwork(nn.Module):
 
         logging.info('Creating critic network...')
 
-        self.checkpoint_file = os.path.join(ckpt_dir, 'critic_torch_ppo')
+        self.checkpoint_file = os.path.join(ckpt_dir, 'critic_torch_ppo_tl')
 
-        kernel_size = (5, 5)
+        self.base_model = models.resnet18(pretrained=True)
+        if input_channels != 3:
+            self.base_model.conv1 = nn.Conv2d(input_channels, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3),
+                                              bias=False)
 
-        # self.cnn_layer = nn.Sequential(
-        #     nn.Conv2d(input_channels, 32, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2)),
-        #     nn.ReLU(),
-        #     nn.MaxPool2d((2, 2), stride=(2, 2)),
-        #     nn.Conv2d(32, 64, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2)),
-        #     nn.ReLU(),
-        #     nn.MaxPool2d((2, 2), stride=(2, 2)),
-        # )
-
-        self.cnn_layer = nn.Sequential(
-            nn.Conv2d(input_channels, 32, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(32),
+        num_features = self.base_model.fc.in_features
+        self.base_model.fc = nn.Sequential(
+            nn.Linear(num_features, 512),
             nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-        )
-
-        # self.dense_layer = nn.Sequential(
-        #     nn.Flatten(start_dim=1),
-        #     nn.Linear(64 * (height // 4) * (width // 4), 512),
-        #     nn.ReLU(),
-        #     nn.Linear(512, 1)
-        # )
-
-        conv_output_size = self._get_conv_output_shape((input_channels, height, width))
-
-        self.dense_layer = nn.Sequential(
-            nn.Linear(conv_output_size, 512),
-            nn.ReLU(),
-            nn.Linear(512, 1)
+            nn.Linear(512, 1),
         )
 
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
@@ -196,14 +122,7 @@ class CriticNetwork(nn.Module):
         self.to(self.device)
 
     def forward(self, state):
-        features = self.cnn_layer(state)
-        features = features.view(features.size(0), -1)  # Flatten the features
-        value = self.dense_layer(features)
-        return value
-
-    def _get_conv_output_shape(self, shape):
-        o = self.cnn_layer(torch.zeros(1, *shape))
-        return int(np.prod(o.size()))
+        return self.base_model(state)
 
     def save_checkpoint(self):
         print('... saving checkpoint ...')
@@ -213,7 +132,7 @@ class CriticNetwork(nn.Module):
         print('... loading checkpoint ...')
         self.load_state_dict(torch.load(self.checkpoint_file))
 
-class PPO_Agent:
+class PPO_Agent_tl:
     def __init__(self, n_actions, input_channels, height, width, gamma=0.99, lr=0.0003, gae_lambda=0.95, policy_clip=0.2, batch_size=64, N=2024, n_epoch=10):
         self.gamma = gamma
         self.policy_clip = policy_clip
@@ -239,11 +158,14 @@ class PPO_Agent:
         state = torch.tensor(state, dtype=torch.float32).to(self.actor.device)
         state = state.unsqueeze(0)
 
-        dist = self.actor(state)
-        value = self.critic(state)
+        action_probs = self.actor(state)
+        dist = Categorical(action_probs)
+
         action = dist.sample()
 
         probs = torch.squeeze(dist.log_prob(action)).item()
+        value = self.critic(state)
+
         action = torch.squeeze(action).item()
         value = torch.squeeze(value).item()
 
@@ -289,7 +211,9 @@ class PPO_Agent:
                 old_probs = torch.tensor(old_prob_arr[batch]).to(self.actor.device)
                 actions = torch.tensor(action_arr[batch]).to(self.actor.device)
 
-                dist = self.actor(states)
+                action_probs = self.actor(states)
+                dist = Categorical(action_probs)
+
                 critic_value = self.critic(states)
                 critic_value = torch.squeeze(critic_value)
 
