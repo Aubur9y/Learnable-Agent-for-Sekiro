@@ -50,35 +50,31 @@ class SekiroEnv:
         return list(range(len(AGENT_KEYMAP)))
 
     def __calculate_reward(self, agent_hp: float, agent_ep: float, boss_hp: float) -> float:
-        """
-        reward = 200 * (agent_hp - last_agent_hp) + 1000 * (last_boss_hp - boss_hp) + 50 * min(0, last_agent_ep - agent_ep)
-        if agent is dead then reward = -200 * last_agent_hp
-        """
-        time_penalty = -1
-        rewards = np.array(
-            [agent_hp - self.last_agent_hp,
-             self.last_boss_hp - boss_hp,
-             min(0.0, self.last_agent_ep - agent_ep)]
-        )
-        weights = np.array([40, 200, 10])
-        reward = weights.dot(rewards).item() + time_penalty
-        reward = -40 * self.last_agent_hp if agent_hp == 0 else reward
-
-        self.last_agent_hp = agent_hp
-        self.last_agent_ep = agent_ep
-        self.last_boss_hp = boss_hp
+        # time_penalty = -1
+        # rewards = np.array(
+        #     [agent_hp - self.last_agent_hp,
+        #      self.last_boss_hp - boss_hp]
+        # )
+        # weights = np.array([200, 1000])
+        # reward = weights.dot(rewards).item()
+        # reward = -50 * self.last_agent_hp if agent_hp == 0 else reward
+        #
+        # self.last_agent_hp = agent_hp
+        # # self.last_agent_ep = agent_ep
+        # self.last_boss_hp = boss_hp
+        if agent_hp == 0:
+            reward = -20
+        elif boss_hp == 0:
+            reward = 40
+        else:
+            self_hp_loss = agent_hp - self.last_agent_hp
+            boss_hp_reward = self.last_boss_hp - boss_hp
+            self_ep_loss = agent_ep - self.last_agent_ep  # default is 1.4 and decrease
+            reward = 20 * self_hp_loss + 40 * boss_hp_reward + 5 * self_ep_loss
 
         return reward
 
     def step(self, action: int) -> Tuple[Tuple[npt.NDArray[np.uint8], float, float, float], float, bool]:
-        """
-        Perform the action and observe the result.
-
-        Returns:
-            state (Tuple): The state which consists of the screenshot, agent hp, agent ep, and boss hp.
-            reward (float): The reward for performing the action.
-            done (bool): Whether the agent is done with its actions.
-        """
         self.memory.resetEndurance()
 
         lock_state = self.memory.lockBoss()

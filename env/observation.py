@@ -1,11 +1,9 @@
 import ctypes
 import logging
-from datetime import datetime
 from typing import Tuple
 
 import numpy as np
 import numpy.typing as npt
-from icecream import ic
 from PIL import Image, ImageGrab
 from utils import timeLog
 
@@ -13,11 +11,7 @@ from .env_config import FOCUS_ANCHOR, FOCUS_SIZE, SCREEN_ANCHOR, SCREEN_SIZE
 from .memory import Memory
 
 
-class Observer():
-    """[summary]
-    yield raw observation
-    """
-
+class Observer:
     def __init__(self, handle: int, memory: Memory) -> None:
         self.handle = handle
         self.memory = memory
@@ -55,14 +49,6 @@ class Observer():
     @timeLog
     def state(self, screen_shot: npt.NDArray[np.int16]) -> \
             Tuple[npt.NDArray[np.uint8], float, float, float]:
-        """[summary]
-
-        State:
-            image           npt.NDArray[np.uint8]
-            agent_hp        float, [0, 1]
-            agent_ep        float, [0, 1]
-            boss_hp         float, [0, 1]
-        """
         agent_hp, agent_ep, boss_hp = self.memory.getStatus()
 
         focus_area = Image.fromarray(self.__select(

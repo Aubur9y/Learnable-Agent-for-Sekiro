@@ -1,7 +1,3 @@
-import torch
-torch.cuda.empty_cache()
+import torch.version
 
-foo = torch.tensor([1,2,3])
-foo = foo.to('cuda')
-
-print(foo)
+print(torch.version.cuda)

@@ -8,17 +8,31 @@ import pygetwindow as gw
 from PPO_network import PPO_Agent
 from ppo_w_transfer_learning import PPO_Agent_tl
 from env import SekiroEnv
+import keyboard
+
+def wait_for_start_key():
+    print("Press 'T' to start training.")
+    keyboard.wait('t')  # This blocks until 'T' is pressed
+    print("Training started.")
+
+def check_for_stop_key():
+    if keyboard.is_pressed('t'):  # Check if 'T' is pressed
+        print("Training stopped by user.")
+        return True
+    return False
 
 parser = argparse.ArgumentParser(
     usage='''python3 ppo_train.py model/{model name}.pth'''
 )
 
-parser.add_argument('model', type=str, help='model path')
+parser.add_argument('actor_checkpoint', type=str, help='actor checkpoint path')
+parser.add_argument('critic_checkpoint', type=str, help='critic checkpoint path')
+parser.add_argument('EPISODES', type=int, help='number of episodes')
 
 args = parser.parse_args()
 
-if os.path.isfile(args.model):
-    print(f"The model '{args.model}' already exists.")
+if os.path.isfile(args.actor_checkpoint) or os.path.isfile(args.critic_checkpoint):
+    print(f"The model '{args.actor_checkpoint}' or '{args.critic_checkpoint}' already exists.")
     sys.exit(1)
 
 width = 224
@@ -27,14 +41,17 @@ input_channels = 3
 n_actions = 7
 save_frequency = 5
 
-transfer_learning_enabled = True
+transfer_learning_enabled = False
+
+file_path_actor = args.actor_checkpoint
+file_path_critic = args.critic_checkpoint
 
 # Constants for PPO
 N = 10
-batch_size = 32  # 32-64
+batch_size = 16  # 32-64
 n_epochs = 4  # 4-10
 alpha = 0.0003  # 0.0001-0.0003
-EPISODES = 200
+EPISODES = args.EPISODES
 gamma = 0.99  # 0.98-0.99
 gae_lambda = 0.95  # 0.92-0.98
 policy_clip = 0.2  # 0.1-0.2
@@ -57,6 +74,7 @@ def wait_for_sekiro_window():
 
 if __name__ == '__main__':
     wait_for_sekiro_window()
+    wait_for_start_key()
 
     if transfer_learning_enabled:
         agent = PPO_Agent_tl(n_actions, input_channels, height, width, gamma, alpha, gae_lambda, policy_clip, batch_size, N, n_epochs)
@@ -90,8 +108,13 @@ if __name__ == '__main__':
                 run["ppo/train/batch/loss"].append(loss)
             state = next_state
 
+            if check_for_stop_key():
+                agent.save_model(file_path_actor, file_path_critic)
+                run.stop()
+                sys.exit(0)
+
         if episode % save_frequency == 0:
-            agent.save_model()
+            agent.save_model(file_path_actor, file_path_critic)
 
         average_reward_per_episode = sum(total_reward) / len(total_reward)
 

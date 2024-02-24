@@ -14,6 +14,19 @@ from DuellingDQN_network import DeullingDQN_Agent
 from env import SekiroEnv
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import tkinter as Tk
+import keyboard
+
+def wait_for_start_key():
+    print("Press 'T' to start training.")
+    keyboard.wait('t')  # This blocks until 'T' is pressed
+    print("Training started.")
+
+def check_for_stop_key():
+    if keyboard.is_pressed('t'):  # Check if 'T' is pressed
+        print("Training stopped by user.")
+        return True
+    return False
+
 
 plt.style.use('seaborn-v0_8-darkgrid')
 
@@ -33,19 +46,21 @@ if os.path.isfile(args.model):
 width = 224
 height = 224
 input_channels = 3
-EPISODES = 200
+EPISODES = 1
 round_count_for_graph = 0
 n_actions = 7
 batch_size = 64
 gamma = 0.99
 lr = 0.0003
 epsilon = 1
-save_frequency = 5
+save_frequency = 50
 paused = True
 episode_numbers = []
 average_rewards = []
 file_path = args.model
-model_used = 'Duelling_DQN'  # DQN or Duelling_DQN
+model_used = 'DQN'  # DQN or Duelling_DQN
+
+FRAME_SKIP = 4
 
 # Constants for PPO
 
@@ -153,6 +168,7 @@ if __name__ == '__main__':
     )
 
     wait_for_sekiro_window()
+    wait_for_start_key()
 
     if model_used == 'Duelling_DQN':
         agent = DeullingDQN_Agent(gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions)
@@ -168,43 +184,55 @@ if __name__ == '__main__':
 
     for episode in range(EPISODES):
         done = False
-        total_reward = 0
+        total_episode_reward = 0
         round_count = 0
         q_val_list = []
 
         state = env.reset()  # img, agent_hp, agent_ep, boss_hp
+        next_state = state
         reshaped_state_0 = state[0].reshape(input_channels, width, height)
 
         while not done:
-            # paused = check_pause(False)
-
             action, q_val = agent.choose_action(reshaped_state_0)
-            next_state, reward, done = env.step(action)
+            total_reward = 0
+
+            for _ in range(FRAME_SKIP):
+                next_state, reward, done = env.step(action)
+                total_reward += reward
+                if done:
+                    break
+
             reshaped_next_state_0 = next_state[0].reshape(input_channels, width, height)
 
             logging.debug(f"state shape: {next_state[0].shape}")
             logging.debug(f"reshaped state shape: {reshaped_next_state_0.shape}")
 
-            agent.store_data(reshaped_state_0, action, reward, reshaped_next_state_0, done)
+            agent.store_data(reshaped_state_0, action, total_reward, reshaped_next_state_0, done)
             loss = agent.learn()
 
-            run["dqn/train/batch/reward"].append(reward)
+            run["dqn/train/batch/reward"].append(total_reward)
             run["dqn/train/batch/loss"].append(loss)
 
-            logging.info(f"action: {action}, reward: {reward}, done: {done}")
+            logging.info(f"action: {action}, reward: {total_reward}, done: {done}")
 
             state = next_state
-            total_reward += reward
+            reshaped_next_state_0 = reshaped_next_state_0
+            total_episode_reward += total_reward
 
             q_val_list.append(q_val)
             round_count += 1
             round_count_for_graph += 1
 
+            if check_for_stop_key():
+                agent.save_model(file_path)
+                run.stop()
+                sys.exit(0)
+
             # reward_graph.update(round_count_for_graph, reward)
             # if loss is not None:
             #     loss_graph.update(round_count_for_graph, loss)
 
-        average_reward_per_episode = total_reward / round_count
+        average_reward_per_episode = total_episode_reward / round_count
         average_q_val = sum(q_val_list) / len(q_val_list)
         # average_rewards.append(average_reward_per_episode)
         # episode_numbers.append(episode + 1)
@@ -215,7 +243,7 @@ if __name__ == '__main__':
         if episode % save_frequency == 0:  # Save the model after every 10 episodes
             agent.save_model(file_path)
 
-        average_reward_per_episode = total_reward / round_count
         print(f'Episode: {episode}, Average Reward: {average_reward_per_episode}')  # Print the reward for this episode
     # plot_graph(episode_numbers, average_rewards, lr)
+    agent.save_model(file_path)
     run.stop()

@@ -62,7 +62,8 @@ class ActorNetwork(nn.Module):
 
         logging.info('Creating actor network...')
 
-        self.base_model = models.resnet18(pretrained=True)
+        # self.base_model = models.resnet18(pretrained=True)
+        self.base_model = models.resnet34(pretrained=True)
 
         self.checkpoint_file = os.path.join(ckpt_dir, 'actor_torch_ppo_tl')
 
@@ -89,13 +90,13 @@ class ActorNetwork(nn.Module):
     def forward(self, state):
         return self.base_model(state)
 
-    def save_checkpoint(self):
+    def save_checkpoint(self, file_path):
         print('... saving checkpoint ...')
-        torch.save(self.state_dict(), self.checkpoint_file)
+        torch.save(self.state_dict(), file_path)
 
-    def load_checkpoint(self):
+    def load_checkpoint(self, file_path):
         print('... loading checkpoint ...')
-        self.load_state_dict(torch.load(self.checkpoint_file))
+        self.load_state_dict(torch.load(file_path))
 
 class CriticNetwork(nn.Module):
     def __init__(self, input_channels, lr, height, width, ckpt_dir='ckpt/ppo'):
@@ -105,7 +106,8 @@ class CriticNetwork(nn.Module):
 
         self.checkpoint_file = os.path.join(ckpt_dir, 'critic_torch_ppo_tl')
 
-        self.base_model = models.resnet18(pretrained=True)
+        # self.base_model = models.resnet18(pretrained=True)
+        self.base_model = models.resnet34(pretrained=True)
         if input_channels != 3:
             self.base_model.conv1 = nn.Conv2d(input_channels, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3),
                                               bias=False)
@@ -124,13 +126,13 @@ class CriticNetwork(nn.Module):
     def forward(self, state):
         return self.base_model(state)
 
-    def save_checkpoint(self):
+    def save_checkpoint(self, file_path):
         print('... saving checkpoint ...')
-        torch.save(self.state_dict(), self.checkpoint_file)
+        torch.save(self.state_dict(), file_path)
 
-    def load_checkpoint(self):
+    def load_checkpoint(self, file_path):
         print('... loading checkpoint ...')
-        self.load_state_dict(torch.load(self.checkpoint_file))
+        self.load_state_dict(torch.load(file_path))
 
 class PPO_Agent_tl:
     def __init__(self, n_actions, input_channels, height, width, gamma=0.99, lr=0.0003, gae_lambda=0.95, policy_clip=0.2, batch_size=64, N=2024, n_epoch=10):
@@ -146,13 +148,13 @@ class PPO_Agent_tl:
     def store_data(self, state, action, probs, vals, reward, done):
         self.memory.store_memory(state, action, probs, vals, reward, done)
 
-    def save_model(self):
-        self.actor.save_checkpoint()
-        self.critic.save_checkpoint()
+    def save_model(self, file_path_actor, file_path_critic):
+        self.actor.save_checkpoint(file_path_actor)
+        self.critic.save_checkpoint(file_path_critic)
 
-    def load_models(self):
-        self.actor.load_checkpoint()
-        self.critic.load_checkpoint()
+    def load_models(self, file_path_actor, file_path_critic):
+        self.actor.load_checkpoint(file_path_actor)
+        self.critic.load_checkpoint(file_path_critic)
 
     def choose_action(self, state):
         state = torch.tensor(state, dtype=torch.float32).to(self.actor.device)

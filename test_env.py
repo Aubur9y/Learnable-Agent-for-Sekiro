@@ -1,6 +1,6 @@
 import gym
 import numpy as np
-from PPO_network import Agent
+from PPO_network import PPO_Agent
 
 if __name__ == '__main__':
     env = gym.make('CartPole-v0')
@@ -8,7 +8,7 @@ if __name__ == '__main__':
     batch_size = 5
     n_epochs = 4
     alpha = 0.0003
-    agent = Agent(n_actions=env.action_space.n, input_dims=env.observation_space.shape, gamma=0.99, lr=alpha, gae_lambda=0.95, policy_clip=0.2, batch_size=batch_size, N=N, n_epoch=n_epochs)
+    agent = PPO_Agent(n_actions=env.action_space.n, input_channels=env.observation_space.shape, gamma=0.99, lr=alpha, gae_lambda=0.95, policy_clip=0.2, batch_size=batch_size, N=N, n_epoch=n_epochs)
     n_games = 300
 
     best_score = env.reward_range[0]
