@@ -231,7 +231,7 @@ class PPO_Agent:
         self.actor.save_checkpoint(file_path_actor)
         self.critic.save_checkpoint(file_path_critic)
 
-    def load_models(self, file_path_actor, file_path_critic):
+    def load_model(self, file_path_actor, file_path_critic):
         self.actor.load_checkpoint(file_path_actor)
         self.critic.load_checkpoint(file_path_critic)
 

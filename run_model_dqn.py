@@ -1,9 +1,15 @@
+import neptune
 import torch
 import os
 import argparse
 from DQN_network import DQN_Agent
 from DuellingDQN_network import DeullingDQN_Agent
 from env import SekiroEnv
+
+run = neptune.init_run(
+    project="aubury/sekiro",
+    api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiI2MTAyMTdhMS03YWRmLTQ4YzUtYTE5Zi0yYTU2OTQxNzVkM2QifQ==",
+)
 
 parser = argparse.ArgumentParser(description='Evaluate a trained DQN or Duelling DQN model')
 parser.add_argument('input_model_path', type=str, help='input model path')
@@ -48,7 +54,13 @@ for episode in range(num_eval_episodes):
     total_rewards.append(total_reward)
     print(f"Episode {episode + 1}: {total_reward}")
 
+    average_reward = sum(total_rewards) / len(total_rewards)
+    run["dqn/evaluate/episode/average reward per episode"].append(average_reward)
+
 average_reward = sum(total_rewards) / len(total_rewards)
-win_ratio = env.get_boss_death_count() / env.get_player_death_count()
+win_rate = env.get_boss_death_count() / env.get_player_death_count()
+print('win ratio:', rate)
+
+run.stop()
 
 
