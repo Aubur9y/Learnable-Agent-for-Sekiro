@@ -65,6 +65,14 @@ class ActorNetwork(nn.Module):
         # self.base_model = models.resnet18(pretrained=True)
         self.base_model = models.resnet34(pretrained=True)
 
+        # freeze all layers
+        for param in self.base_model.parameters():
+            param.requires_grad = False
+
+        # unfreeze the last 3 layers
+        for param in self.base_model.layer4.parameters():
+            param.requires_grad = True
+
         self.checkpoint_file = os.path.join(ckpt_dir, 'actor_torch_ppo_tl')
 
         if input_channels != 3:
@@ -108,6 +116,15 @@ class CriticNetwork(nn.Module):
 
         # self.base_model = models.resnet18(pretrained=True)
         self.base_model = models.resnet34(pretrained=True)
+
+        # freeze all layers
+        for param in self.base_model.parameters():
+            param.requires_grad = False
+
+        # unfreeze the last 3 layers
+        for param in self.base_model.layer4.parameters():
+            param.requires_grad = True
+
         if input_channels != 3:
             self.base_model.conv1 = nn.Conv2d(input_channels, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3),
                                               bias=False)

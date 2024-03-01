@@ -33,12 +33,14 @@ plt.style.use('seaborn-v0_8-darkgrid')
 parser = argparse.ArgumentParser(
     usage='''python3 train.py model/{model name}.pth'''
 )
-parser.add_argument('model', type=str, help='model path')
+parser.add_argument('model_path', type=str, help='model path')
+parser.add_argument('model_used', type=str, help='model name')
+parser.add_argument('EPISODES', type=int, help='number of episodes')
 
 # parse the arguments
 args = parser.parse_args()
 
-if os.path.isfile(args.model):
+if os.path.isfile(args.model_path):
     print(f"The model '{args.model}' already exists.")
     sys.exit(1)
 
@@ -46,10 +48,10 @@ if os.path.isfile(args.model):
 width = 224
 height = 224
 input_channels = 3
-EPISODES = 1
+EPISODES = args.EPISODES
 round_count_for_graph = 0
 n_actions = 7
-batch_size = 64
+batch_size = 32
 gamma = 0.99
 lr = 0.0003
 epsilon = 1
@@ -57,8 +59,8 @@ save_frequency = 50
 paused = True
 episode_numbers = []
 average_rewards = []
-file_path = args.model
-model_used = 'DQN'  # DQN or Duelling_DQN
+file_path = args.model_path
+model_used = args.model_used
 
 FRAME_SKIP = 4
 
@@ -170,7 +172,7 @@ if __name__ == '__main__':
     wait_for_sekiro_window()
     wait_for_start_key()
 
-    if model_used == 'Duelling_DQN':
+    if model_used == 'DDQN':
         agent = DeullingDQN_Agent(gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions)
     elif model_used == 'DQN':
         agent = DQN_Agent(gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions)

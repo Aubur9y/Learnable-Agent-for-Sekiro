@@ -51,26 +51,36 @@ class SekiroEnv:
 
     def __calculate_reward(self, agent_hp: float, agent_ep: float, boss_hp: float) -> float:
         # time_penalty = -1
-        # rewards = np.array(
-        #     [agent_hp - self.last_agent_hp,
-        #      self.last_boss_hp - boss_hp]
-        # )
-        # weights = np.array([200, 1000])
-        # reward = weights.dot(rewards).item()
-        # reward = -50 * self.last_agent_hp if agent_hp == 0 else reward
-        #
-        # self.last_agent_hp = agent_hp
-        # # self.last_agent_ep = agent_ep
-        # self.last_boss_hp = boss_hp
-        if agent_hp == 0:
-            reward = -20
-        elif boss_hp == 0:
-            reward = 40
-        else:
-            self_hp_loss = agent_hp - self.last_agent_hp
-            boss_hp_reward = self.last_boss_hp - boss_hp
-            self_ep_loss = agent_ep - self.last_agent_ep  # default is 1.4 and decrease
-            reward = 20 * self_hp_loss + 40 * boss_hp_reward + 5 * self_ep_loss
+        boss_max_hp = 1.00
+        boss_hp_percent = boss_hp / boss_max_hp
+        reward_multiplier = min(5.0, 1 / boss_hp_percent if boss_hp_percent != 0 else 1)
+        damage_dealt = self.last_boss_hp - boss_hp
+        boss_reward = damage_dealt * reward_multiplier
+
+        rewards = np.array(
+            [agent_hp - self.last_agent_hp,
+             boss_reward,
+             min(0.0, self.last_agent_ep - agent_ep)]
+        )
+        weights = np.array([200, 100, 50])
+        reward = weights.dot(rewards).item()
+        reward = -50 * self.last_agent_hp if agent_hp == 0 else reward
+
+        self.last_agent_hp = agent_hp
+        self.last_agent_ep = agent_ep
+        self.last_boss_hp = boss_hp
+        # if agent_hp == 0:
+        #     reward = -20
+        # elif boss_hp == 0:
+        #     reward = 40
+        # else:
+        #     self_hp_reward = 0
+        #     boss_hp_reward = 0
+        #     if agent_hp < self.last_agent_hp:
+        #         self_hp_reward = -10
+        #     elif boss_hp < self.last_boss_hp:
+        #         boss_hp_reward = 20
+        #     reward = self_hp_reward + boss_hp_reward
 
         return reward
 

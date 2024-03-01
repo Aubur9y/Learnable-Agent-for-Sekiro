@@ -22,12 +22,13 @@ def check_for_stop_key():
     return False
 
 parser = argparse.ArgumentParser(
-    usage='''python3 ppo_train.py model/{model name}.pth'''
+    usage='''python3 ppo_train.py ckpt/{ckpt path for actior network} ckpt/{ckpt path for critic network} number of epsidoes Ture/False'''
 )
 
 parser.add_argument('actor_checkpoint', type=str, help='actor checkpoint path')
 parser.add_argument('critic_checkpoint', type=str, help='critic checkpoint path')
 parser.add_argument('EPISODES', type=int, help='number of episodes')
+parser.add_argument('transfer_learning', type=bool, default=False, help='enable transfer learning')
 
 args = parser.parse_args()
 
@@ -41,15 +42,15 @@ input_channels = 3
 n_actions = 7
 save_frequency = 5
 
-transfer_learning_enabled = False
+transfer_learning_enabled = args.transfer_learning
 
 file_path_actor = args.actor_checkpoint
 file_path_critic = args.critic_checkpoint
 
 # Constants for PPO
-N = 10
-batch_size = 16  # 32-64
-n_epochs = 4  # 4-10
+N = 100 # this is the number of steps before we update the network
+batch_size = 64  # 32-64
+n_epochs = 10  # 4-10
 alpha = 0.0003  # 0.0001-0.0003
 EPISODES = args.EPISODES
 gamma = 0.99  # 0.98-0.99

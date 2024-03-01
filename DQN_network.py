@@ -166,7 +166,7 @@ class DQN_Agent:
 
         action_batch = self.action_memory[batch]
 
-        # Computer current Q-values according to the evaluation network
+        # Compute current Q-values according to the evaluation network
         q_eval = self.Q_eval.forward(state_batch)[batch_index, action_batch]
         # Compute the Q-values of the next states according to the target network,
         # the reason I use the target network is to avoid the moving target problem

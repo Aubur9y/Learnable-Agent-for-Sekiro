@@ -76,14 +76,11 @@ class ActorNetwork(nn.Module):
 
         self.cnn_layer = nn.Sequential(
             nn.Conv2d(input_channels, 32, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(32),
             nn.ReLU(),
             nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(64),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(128),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2)
         )
@@ -164,14 +161,11 @@ class CriticNetwork(nn.Module):
 
         self.cnn_layer = nn.Sequential(
             nn.Conv2d(input_channels, 32, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(32),
             nn.ReLU(),
             nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(64),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(128),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
@@ -275,7 +269,11 @@ class PPO_Agent:
                 discount = 1
                 a_t = 0
                 for k in range(t, len(reward_arr) - 1):
+                    # immediate reward + discounted future reward
+                    # 1 - done ensures the next state is not considered if the current state is terminal
+                    # A(s, a) = Q(s, a) - V(s)
                     a_t += discount * (reward_arr[k] + self.gamma * values[k+1] * (1-int(dones_arr[k])) - values[k])
+                    # closer to 0 make the advantage estimate rely more heavily on the next step, closer to 1 make it average over the next few steps
                     discount *= self.gamma * self.gae_lambda
                 advantage[t] = a_t
 
@@ -300,7 +298,7 @@ class PPO_Agent:
                 weighted_clipped_probs = torch.clamp(prob_ratio, 1-self.policy_clip, 1+self.policy_clip) * advantage[batch]
 
                 entropy = dist.entropy().mean()
-                actor_loss = -torch.min(weighted_probs, weighted_clipped_probs).mean() - 0.0 * entropy  # experiment with 1 x 10^-1,-2,-3,-4
+                actor_loss = -torch.min(weighted_probs, weighted_clipped_probs).mean() - 0.001 * entropy  # experiment with 1 x 10^-1,-2,-3,-4
                 returns = advantage[batch] + values[batch]
                 critic_loss = (returns - critic_value)**2
                 critic_loss = critic_loss.mean()
