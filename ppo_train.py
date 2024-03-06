@@ -49,7 +49,7 @@ file_path_critic = args.critic_checkpoint
 
 # Constants for PPO
 N = 100 # this is the number of steps before we update the network
-batch_size = 64  # 32-64
+batch_size = 128  # 32-64
 n_epochs = 10  # 4-10
 alpha = 0.0003  # 0.0001-0.0003
 EPISODES = args.EPISODES

@@ -15,17 +15,23 @@ class DQNnetwork(nn.Module):
         kernel_size = (5, 5)
 
         self.cnn_layer = nn.Sequential(
-            nn.Conv2d(input_channels, 32, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2)),
+            nn.Conv2d(input_channels, 32, kernel_size=8,  stride=4),
             nn.ReLU(),
-            nn.MaxPool2d((2, 2), stride=(2, 2)),
-            nn.Conv2d(32, 64, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2)),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
             nn.ReLU(),
-            nn.MaxPool2d((2, 2), stride=(2, 2)),
+            nn.Conv2d(64, 128, kernel_size=3, stride=1),
+            nn.ReLU(),
+            nn.Conv2d(128, 256, kernel_size=3, stride=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(256),
         )
+
+        with torch.no_grad():
+            self.flat_size = self._get_conv_output((input_channels, height, width))
 
         self.dense_layer = nn.Sequential(
             nn.Flatten(start_dim=1),
-            nn.Linear(64 * (height // 4) * (width // 4), 512),
+            nn.Linear(self.flat_size, 512),
             nn.ReLU(),
             nn.Dropout(p=0.2),
             nn.Linear(512, 256),
@@ -34,39 +40,20 @@ class DQNnetwork(nn.Module):
             nn.Linear(256, n_actions),
         )
 
-        # self.conv1 = nn.Conv2d(input_channels, 32, kernel_size, stride=4, padding=2)
-        # self.conv2 = nn.Conv2d(32, 64, kernel_size, stride=2, padding=2)
-        # self.conv3 = nn.Conv2d(64, 128, kernel_size, stride=1, padding=2)
-        # self.fc1_input_dims = self.get_conv_output_dims((height, width))
-        #
-        # self.fc1 = nn.Linear(self.fc1_input_dims, 512)
-        # self.dropout = nn.Dropout(p=0.3)
-        # self.fc2 = nn.Linear(512, 256)
-        # self.fc3 = nn.Linear(256, n_actions)
-        #
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
         self.loss = nn.HuberLoss()
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
 
+    def _get_conv_output(self, shape):
+        input = torch.zeros(1, *shape)
+        output = self.cnn_layer(input)
+        return int(np.prod(output.size()))
+
     def forward(self, state):
         x = self.cnn_layer(state)
         actions = self.dense_layer(x)
         return actions
-        # x = F.relu(self.conv1(state))
-        # x = F.max_pool2d(x, kernel_size=2)
-        # x = F.relu(self.conv2(x))
-        # x = F.max_pool2d(x, kernel_size=2)
-        # x = F.relu(self.conv3(x))
-        #
-        # x = x.view(x.size(0), -1)
-        #
-        # x = F.relu(self.fc1(x))  # Batch normalization
-        # x = self.dropout(x)
-        # x = F.relu(self.fc2(x))  # Batch normalization
-        # x = self.dropout(x)
-        # actions = self.fc3(x)
-        # return actions
 
     def get_conv_output_dims(self, input_dims):
         """ This method is used to calculate the output dimension of the convolutional layers,

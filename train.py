@@ -31,7 +31,7 @@ def check_for_stop_key():
 plt.style.use('seaborn-v0_8-darkgrid')
 
 parser = argparse.ArgumentParser(
-    usage='''python3 train.py model/{model name}.pth'''
+    usage='''python3 train.py model/{model name}.pth DQN 50'''
 )
 parser.add_argument('model_path', type=str, help='model path')
 parser.add_argument('model_used', type=str, help='model name')
