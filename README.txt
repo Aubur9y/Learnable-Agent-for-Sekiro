@@ -7,6 +7,8 @@ Download and install this mod at: https://www.nexusmods.com/sekiro/mods/381/ to 
 
 In order to run the code, the game has to be completed once, or you can download a full completed save file online.
 
+To use saves from the internet, you have to download the application called "SimpleSekiroHelper". Tutorials can be found here: https://www.nexusmods.com/sekiro/mods/274
+
 This code requires custom key and game settings
 
 Game settings: 
