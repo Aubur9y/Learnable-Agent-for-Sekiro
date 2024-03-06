@@ -22,7 +22,7 @@ def check_for_stop_key():
     return False
 
 parser = argparse.ArgumentParser(
-    usage='''python3 ppo_train.py ckpt/{ckpt path for actior network} ckpt/{ckpt path for critic network} number of epsidoes Ture/False'''
+    usage='''python3 ppo_train.py ckpt/{ckpt path for actior network} ckpt/{ckpt path for critic network} {number of epsidoes} {Ture/False}'''
 )
 
 parser.add_argument('actor_checkpoint', type=str, help='actor checkpoint path')

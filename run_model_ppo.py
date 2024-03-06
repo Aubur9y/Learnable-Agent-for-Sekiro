@@ -12,7 +12,7 @@ run = neptune.init_run(
 )
 
 parser = argparse.ArgumentParser(description='Evaluate a trained ppo model (with transfer learning)')
-parser.add_argument('input_actor_network__path', type=str, help='input actor network path')
+parser.add_argument('input_actor_network_path', type=str, help='input actor network path')
 parser.add_argument('input_critic_network_path', type=str, help='input critic network path')
 parser.add_argument('--model_type', type=str, default='PPO', help='PPO or PPO_tl')
 parser.add_argument('--episodes', type=int, default=100, help='number of episodes to run')
