@@ -59,7 +59,7 @@ for episode in range(num_eval_episodes):
 
 average_reward = sum(total_rewards) / len(total_rewards)
 win_rate = env.get_boss_death_count() / env.get_player_death_count()
-print('win ratio:', rate)
+print('win ratio:', win_rate)
 
 run.stop()
 

@@ -28,6 +28,7 @@ from .observation import Observer
 class SekiroEnv:
     boss_death_count = 0
     player_death_count = 0
+    steps_without_being_hit = 0
 
     def __init__(self) -> None:
         self.handle = self.__get_game_handle()
@@ -69,18 +70,53 @@ class SekiroEnv:
         # self.last_agent_hp = agent_hp
         # self.last_agent_ep = agent_ep
         # self.last_boss_hp = boss_hp
+
+        # if agent_hp == 0:
+        #     reward = -40
+        # elif boss_hp == 0:
+        #     reward = 160
+        # else:
+        #     self_hp_reward = 0
+        #     boss_hp_reward = 0
+        #     if agent_hp < self.last_agent_hp:  # agent got hit
+        #         self_hp_reward = -20
+        #     if self.last_boss_hp - boss_hp > 0.05:  # boss got hit, and it's not caused by jumping over the boss
+        #         boss_hp_reward = 80
+        #     reward = self_hp_reward + boss_hp_reward
+        #
+        # self.last_agent_hp = agent_hp
+        # self.last_agent_ep = agent_ep
+        # self.last_boss_hp = boss_hp
+
+        reward = 0
+
         if agent_hp == 0:
-            reward = -20
-        elif boss_hp == 0:
-            reward = 40
-        else:
-            self_hp_reward = 0
-            boss_hp_reward = 0
-            if agent_hp < self.last_agent_hp:
-                self_hp_reward = -10
-            elif boss_hp < self.last_boss_hp:
-                boss_hp_reward = 20
-            reward = self_hp_reward + boss_hp_reward
+            return 40
+
+        if self.last_boss_hp - boss_hp < 0:  # this means boss has died
+            return 160
+
+        # if self.last_agent_hp == agent_hp and self.last_agent_ep == agent_ep:
+        #     self.steps_without_being_hit += 1
+        # else:
+        #     self.steps_without_being_hit = 0
+
+        self_hp_reduced = self.last_agent_hp - agent_hp
+        self_ep_reduced = self.last_agent_ep - agent_ep
+        boss_hp_reduced = self.last_boss_hp - boss_hp
+
+        if self_hp_reduced > 0:
+            reward -= self_hp_reduced * 10
+
+        if self_ep_reduced > 0:
+            reward -= self_ep_reduced * 5
+
+        if boss_hp_reduced > 0.05:
+            reward += boss_hp_reduced * 100
+
+        # if self.steps_without_being_hit >= 20:
+        #     reward += 0.5
+        #     self.steps_without_being_hit = 0
 
         self.last_agent_hp = agent_hp
         self.last_agent_ep = agent_ep

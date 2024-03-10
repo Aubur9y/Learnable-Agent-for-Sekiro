@@ -14,35 +14,36 @@ class DuellingDQN(nn.Module):
 
         # same as dqn network
         self.cnn_layer = nn.Sequential(
-            nn.Conv2d(input_channels, 32, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2)),
+            nn.Conv2d(input_channels, 32, kernel_size=8, stride=4),
             nn.ReLU(),
-            nn.MaxPool2d((2, 2), stride=(2, 2)),
-            nn.Conv2d(32, 64, kernel_size, padding=(kernel_size[0] // 2, kernel_size[1] // 2)),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
             nn.ReLU(),
-            nn.MaxPool2d((2, 2), stride=(2, 2)),
+            nn.Conv2d(64, 128, kernel_size=3, stride=1),
+            nn.ReLU(),
+            nn.Conv2d(128, 256, kernel_size=3, stride=1),
+            nn.ReLU(),
         )
+
+        with torch.no_grad():
+            self.flat_size = self._get_conv_output((input_channels, height, width))
 
         # same structure as the dqn network but output is 1 instead of n_actions
         self.value_stream = nn.Sequential(
             nn.Flatten(start_dim=1),
-            nn.Linear(64 * (height // 4) * (width // 4), 512),
+            nn.Linear(self.flat_size, 512),
             nn.ReLU(),
-            nn.Dropout(p=0.2),
             nn.Linear(512, 256),
             nn.ReLU(),
-            nn.Dropout(p=0.2),
             nn.Linear(256, 1),
         )
 
         # output n_actions
         self.advantage_stream = nn.Sequential(
             nn.Flatten(start_dim=1),
-            nn.Linear(64 * (height // 4) * (width // 4), 512),
+            nn.Linear(self.flat_size, 512),
             nn.ReLU(),
-            nn.Dropout(p=0.2),
             nn.Linear(512, 256),
             nn.ReLU(),
-            nn.Dropout(p=0.2),
             nn.Linear(256, n_actions),
         )
 
@@ -54,6 +55,11 @@ class DuellingDQN(nn.Module):
         """
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
+
+    def _get_conv_output(self, shape):
+        input = torch.zeros(1, *shape)
+        output = self.cnn_layer(input)
+        return int(np.prod(output.size()))
 
     def forward(self, state):
         x = self.cnn_layer(state)
@@ -70,7 +76,7 @@ class DuellingDQN(nn.Module):
 
 class DeullingDQN_Agent:
     def __init__(self, gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions,
-                 max_mem_size=15000, eps_end=0.01, eps_dec=5e-4, target_update=200):
+                 max_mem_size=15000, eps_end=0.01, eps_dec=1e-4, target_update=100):
         self.gamma = gamma
         self.epsilon = epsilon
         self.eps_min = eps_end

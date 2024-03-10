@@ -11,30 +11,55 @@ PRESS_RELEASE_DELAY = 0.02
 
 # NOTE: it takes time for action to take effect,
 #   STEP_DELAY ensures that the action matches its reward
+# STEP_DELAY = {
+#     "attack": 0.7,
+#     "defense": 0.25,
+#     "jump": 0.6,
+#     "forward_dodge": 0.5,
+#     "backward_dodge": 0.5,
+#     "leftward_dodge": 0.5,
+#     "rightward_dodge": 0.5,
+# }
+
 STEP_DELAY = {
-    "attack": 0.7,
-    "defense": 0.25,
-    "jump": 0.6,
-    "forward_dodge": 0.5,
-    "backward_dodge": 0.5,
-    "leftward_dodge": 0.5,
-    "rightward_dodge": 0.5,
+    "attack": 0.15,
+    "defense": 0.08,
+    "jump": 0.12,
+    "forward_dodge": 0.1,
+    "backward_dodge": 0.1,
+    "leftward_dodge": 0.1,
+    "rightward_dodge": 0.1,
 }
 # NOTE: actions that are too frequent are ignored,
 #   ACTION DELAY represents the time between successive actions
+# ACTION_DELAY = {
+#     "attack": 0.6,
+#     "defense": 0.4,
+#     "jump": 0.8,
+#     "forward_dodge": 0.6,
+#     "backward_dodge": 0.6,
+#     "leftward_dodge": 0.6,
+#     "rightward_dodge": 0.6,
+# }
+
 ACTION_DELAY = {
-    "attack": 0.6,
-    "defense": 0.4,
-    "jump": 0.8,
-    "forward_dodge": 0.6,
-    "backward_dodge": 0.6,
-    "leftward_dodge": 0.6,
-    "rightward_dodge": 0.6,
+    "attack": 0.12,
+    "defense": 0.1,
+    "jump": 0.2,
+    "forward_dodge": 0.12,
+    "backward_dodge": 0.12,
+    "leftward_dodge": 0.12,
+    "rightward_dodge": 0.12,
 }
 
-AGENT_DEAD_DELAY = 10
-ROTATION_DELAY = 1
-REVIVE_DELAY = 2.2
+# AGENT_DEAD_DELAY = 10
+# ROTATION_DELAY = 1
+# REVIVE_DELAY = 2.2
+# PAUSE_DELAY = 0.8
+
+AGENT_DEAD_DELAY = 2.5
+ROTATION_DELAY = 0.5
+REVIVE_DELAY = 1.2
 PAUSE_DELAY = 0.8
 
 # NOTE: directX scan codes https://www.google.com/search?q=directInputKeyboardScanCodes

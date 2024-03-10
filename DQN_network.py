@@ -23,7 +23,6 @@ class DQNnetwork(nn.Module):
             nn.ReLU(),
             nn.Conv2d(128, 256, kernel_size=3, stride=1),
             nn.ReLU(),
-            nn.BatchNorm2d(256),
         )
 
         with torch.no_grad():
@@ -33,10 +32,8 @@ class DQNnetwork(nn.Module):
             nn.Flatten(start_dim=1),
             nn.Linear(self.flat_size, 512),
             nn.ReLU(),
-            nn.Dropout(p=0.2),
             nn.Linear(512, 256),
             nn.ReLU(),
-            nn.Dropout(p=0.2),
             nn.Linear(256, n_actions),
         )
 
@@ -72,7 +69,7 @@ class DQNnetwork(nn.Module):
 
 class DQN_Agent:
     def __init__(self, gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions,
-                 max_mem_size=15000, eps_end=0.01, eps_dec=5e-4, target_update=200):
+                 max_mem_size=15000, eps_end=0.3, eps_dec=5e-4, target_update=50):
         self.gamma = gamma
         self.epsilon = epsilon
         self.eps_min = eps_end
