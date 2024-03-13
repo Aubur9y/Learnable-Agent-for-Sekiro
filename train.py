@@ -50,10 +50,10 @@ height = 224
 input_channels = 3
 EPISODES = args.EPISODES
 round_count_for_graph = 0
-n_actions = 4
-batch_size = 32
+n_actions = 7
+batch_size = 128
 gamma = 0.99
-lr = 0.003
+lr = 0.0003
 epsilon = 1
 save_frequency = 50
 paused = True
@@ -62,7 +62,7 @@ average_rewards = []
 file_path = args.model_path
 model_used = args.model_used
 
-FRAME_SKIP = 1
+FRAME_SKIP = 4
 
 # Constants for PPO
 

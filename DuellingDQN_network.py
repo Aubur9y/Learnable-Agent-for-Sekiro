@@ -76,7 +76,7 @@ class DuellingDQN(nn.Module):
 
 class DeullingDQN_Agent:
     def __init__(self, gamma, epsilon, lr, input_channels, height, width, batch_size, n_actions,
-                 max_mem_size=15000, eps_end=0.01, eps_dec=1e-4, target_update=100):
+                 max_mem_size=15000, eps_end=0.01, eps_dec=1e-4, target_update=200):
         self.gamma = gamma
         self.epsilon = epsilon
         self.eps_min = eps_end

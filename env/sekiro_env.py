@@ -91,10 +91,10 @@ class SekiroEnv:
         reward = 0
 
         if agent_hp == 0:
-            return 40
+            return 10
 
         if self.last_boss_hp - boss_hp < 0:  # this means boss has died
-            return 160
+            return 20
 
         # if self.last_agent_hp == agent_hp and self.last_agent_ep == agent_ep:
         #     self.steps_without_being_hit += 1
@@ -106,7 +106,7 @@ class SekiroEnv:
         boss_hp_reduced = self.last_boss_hp - boss_hp
 
         if self_hp_reduced > 0:
-            reward -= self_hp_reduced * 10
+            reward -= self_hp_reduced * 40
 
         if self_ep_reduced > 0:
             reward -= self_ep_reduced * 5
