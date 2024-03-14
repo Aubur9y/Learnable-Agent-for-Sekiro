@@ -8,11 +8,8 @@ Changes I made:
 3.Adds better type hinting for improved type safety.
 4.Uses consistent logging levels."""
 
-
 import logging
 import time
-
-from utils import timeLog
 from .env_config import AGENT_KEYMAP, ENV_KEYMAP, PRESS_RELEASE_DELAY
 from .keyboard import PressKey, ReleaseKey
 

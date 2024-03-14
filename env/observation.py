@@ -33,7 +33,6 @@ class Observer:
         left, top, right, bottom = anchor
         return arr[:, top:bottom, left:right]
 
-    # @timeLog
     def shotScreen(self) -> npt.NDArray[np.int16]:
         screen_shot = ImageGrab.grab(self.anchor)
         # NOTE: C x H x W, "RGB"

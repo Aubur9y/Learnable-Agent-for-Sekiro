@@ -95,13 +95,11 @@ class CodeInjection():
 
 class Memory():
     def __init__(self) -> None:
-        # HACK: Sekiro v1.06
         # NOTE: credit to https://fearlessrevolution.com/viewtopic.php?t=8938
         self.pm = Pymem(f"{GAME_NAME}.exe")
         module_game = pymem.process.module_from_name(
             self.pm.process_handle, f"{GAME_NAME}.exe")
 
-        # NOTE: agent attributes
         """
         E8 ** ** ** ** 48 8B CB
         66 ** ** ** 0F ** ** E8
@@ -110,8 +108,7 @@ class Memory():
         """
         bytes_pattern = b"\xe8....\x48\x8b\xcb\x66...\x0f..\xe8" \
                         b"....\x66...\x0f..\xf3...\x0f"
-        # HACK: sekiro.exe + 0x66888b
-        # self.health_read_addr = module_game.lpBaseOfDll + 0x66888b
+
         health_read_addr = pymem.pattern.pattern_scan_module(
             self.pm.process_handle, module_game, bytes_pattern)
         if health_read_addr is None:
@@ -124,7 +121,7 @@ class Memory():
         pop     rbx
         """
         code_addr = self.pm.allocate(256)
-        self.agent_mem_ptr = self.pm.allocate(8)  # 8 bytes
+        self.agent_mem_ptr = self.pm.allocate(8)
         injected_code = b"\x53" + \
             b"\x48\xbb" + self.agent_mem_ptr.to_bytes(8, "little") + \
             b"\x48\x89\x0b" + b"\x5b"
@@ -133,7 +130,6 @@ class Memory():
             helper_addr=health_read_addr + 0xd46, helper_code_len=13,
             code_addr=code_addr, injected_code=injected_code)
 
-        # NOTE: gesture damage
         """
         45 ** ** 89 ** ** ** 00 00 85 DB
         """
@@ -155,7 +151,7 @@ class Memory():
         pop     rbx
         """
         code_addr = self.pm.allocate(256)
-        self.boss_mem_ptr = self.pm.allocate(8)  # 8 bytes
+        self.boss_mem_ptr = self.pm.allocate(8)
         injected_code = b"\x53" + \
             b"\x48\xbb" + self.agent_mem_ptr.to_bytes(8, "little") + \
             b"\x48\x39\x3b" + b"\x0f\x84\x0d\x00\x00\x00" + \
@@ -166,7 +162,6 @@ class Memory():
             helper_addr=guard_write_addr + 0x33b, helper_code_len=13,
             code_addr=code_addr, injected_code=injected_code)
 
-        # NOTE: damage multiplier
         """
         48 ** ** ** 8B ** 89 ** ** ** 00 00 85 C0 7F
         """
@@ -211,7 +206,7 @@ class Memory():
         pop     rcx
         """
         code_addr = self.pm.allocate(256)
-        damage2boss_multiplier = self.pm.allocate(4)  # 4 bytes
+        damage2boss_multiplier = self.pm.allocate(4)
         self.pm.write_float(damage2boss_multiplier, 2.0)
         damage2agent_multiplier = self.pm.allocate(4)
         self.pm.write_float(damage2agent_multiplier, 0.2)
@@ -236,8 +231,6 @@ class Memory():
         self.boss_mem_ptr = partial(
             self.pm.read_ulonglong, self.boss_mem_ptr)
 
-        # NOTE: automatic boss lock
-        # HACK: sekiro.exe + 0x3d78058
         self.state_mem_ptr = partial(
             self.pm.read_ulonglong, module_game.lpBaseOfDll + 0x3d78058)
         time.sleep(0.5)
@@ -284,13 +277,6 @@ class Memory():
             raise RuntimeError()
 
     def getStatus(self) -> Tuple[float, float, float]:
-        """[summary]
-
-        Returns:
-            agent hp    [0, 1]
-            agent ep    [0, 1]
-            boss hp     [0, 1]
-        """
         try:
             agent_mem_addr = self.agent_mem_ptr()
             agent_hp = self.pm.read_int(agent_mem_addr + 0x130)

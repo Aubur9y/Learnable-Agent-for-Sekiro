@@ -41,3 +41,5 @@ To run/test a trained model in PPO: python3 run_model_ppo.py {input_actor_networ
 
 
 After running the code, press T to start
+
+Models and checkpoint used in this project: https://drive.google.com/drive/folders/10P5tMmMnpKo2j45RkcCOVi6o6HJn7ExT?usp=sharing
