@@ -1,4 +1,4 @@
-![](https://github.com/Aubur9y/Learnable-Agent-for-Sekiro/gif_demo.gif)
+![](https://github.com/Aubur9y/Learnable-Agent-for-Sekiro/blob/main/gif_demo.gif)
 
 Before running the code:
 Ensure you have downloaded the game by either purchasing the game directly from steam or download free versions from the internet.
